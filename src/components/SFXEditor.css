@@ -1,0 +1,323 @@
+.sfx-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: sfxEdIn 0.2s ease;
+}
+
+@keyframes sfxEdIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sfx-editor {
+  background: linear-gradient(135deg, #0e0e18, #12101e);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 20px;
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6);
+  animation: sfxEdCard 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sfxEdCard {
+  from { transform: translateY(20px) scale(0.97); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.sfx-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.sfx-editor-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sfx-editor-close {
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  color: var(--text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.sfx-editor-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+/* Waveform */
+.sfx-waveform-wrap {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.sfx-waveform-canvas {
+  width: 100%;
+  height: 140px;
+  cursor: crosshair;
+  display: block;
+}
+
+.sfx-waveform-times {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 12px 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sfx-waveform-current {
+  color: #fff;
+  font-weight: 600;
+}
+
+.sfx-trim-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  padding: 0 4px;
+}
+
+/* Transport */
+.sfx-transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.sfx-transport-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent, #8b5cf6);
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.3);
+  flex-shrink: 0;
+}
+
+.sfx-transport-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(139, 92, 246, 0.4);
+}
+
+.sfx-volume-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Shared slider style */
+.sfx-slider {
+  -webkit-appearance: none;
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+  cursor: pointer;
+}
+
+.sfx-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent, #8b5cf6);
+  box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
+  cursor: grab;
+}
+
+.sfx-slider-val {
+  font-size: 11px;
+  color: var(--accent, #8b5cf6);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* EQ Section */
+.sfx-eq-section {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-bottom: 20px;
+}
+
+.sfx-eq-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0 0 12px;
+}
+
+.sfx-eq-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+
+.sfx-eq-preset {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.sfx-eq-preset:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.sfx-eq-preset.active {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #c4b5fd;
+}
+
+.sfx-eq-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sfx-eq-band {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sfx-eq-band label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 44px;
+  font-weight: 500;
+}
+
+.sfx-eq-reset {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.sfx-eq-reset:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+/* Action buttons */
+.sfx-editor-actions {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.sfx-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.sfx-action-btn.save {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+}
+
+.sfx-action-btn.save:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+.sfx-action-btn.export {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.25);
+  color: #c4b5fd;
+}
+
+.sfx-action-btn.export:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
+
+.sfx-action-btn.cancel {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+}
+
+.sfx-action-btn.cancel:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.sfx-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

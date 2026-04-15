@@ -1,0 +1,38 @@
+.screensaver {
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  background: #020208;
+  cursor: none;
+  animation: ssIn 1s ease;
+}
+
+@keyframes ssIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.screensaver-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.screensaver-hint {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.15);
+  letter-spacing: 1px;
+  pointer-events: none;
+  animation: ssHint 3s ease 2s both;
+}
+
+@keyframes ssHint {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
