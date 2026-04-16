@@ -20,19 +20,33 @@ export default function WallpaperViz() {
     const st = stateRef.current;
 
     function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const MAX = 1920;
+      const w = window.innerWidth, h = window.innerHeight;
+      const scale = Math.min(1, MAX / Math.max(w, h));
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
       st.particles = null; // regenerate on resize
     }
     resize();
     window.addEventListener('resize', resize);
 
+    // Reuse the audio data array instead of reallocating every frame
+    let reusableData = null;
+
     function draw() {
       animRef.current = requestAnimationFrame(draw);
+      if (document.hidden) return; // pause when minimized
+
       const W = canvas.width, H = canvas.height;
       const analyser = analyserRef.current;
 
-      const dataArray = new Uint8Array(analyser?.frequencyBinCount || 256);
+      const binCount = analyser?.frequencyBinCount || 256;
+      if (!reusableData || reusableData.length !== binCount) {
+        reusableData = new Uint8Array(binCount);
+      }
+      const dataArray = reusableData;
       if (analyser) analyser.getByteFrequencyData(dataArray);
 
       // Audio analysis

@@ -1,4 +1,4 @@
-import { IoPlaySharp, IoEllipsisHorizontal, IoTrash, IoAdd, IoPricetag, IoMusicalNotes, IoCheckbox, IoSquareOutline, IoDownload, IoSpeedometer, IoPencil, IoHeart, IoHeartOutline, IoShareSocial, IoStar, IoStarOutline } from 'react-icons/io5';
+import { IoPlaySharp, IoEllipsisHorizontal, IoTrash, IoAdd, IoPricetag, IoMusicalNotes, IoCheckbox, IoSquareOutline, IoDownload, IoSpeedometer, IoPencil, IoHeart, IoHeartOutline, IoShareSocial, IoStar, IoStarOutline, IoPulse } from 'react-icons/io5';
 import { usePlayer } from '../context/PlayerContext';
 import { updateSong, toggleFavorite, rateSong } from '../utils/db';
 import { useState, useRef, useEffect } from 'react';
@@ -60,6 +60,58 @@ export default function SongList({ songs, onDelete, onSongUpdated, showIndex = t
     }
     setRenamingId(null);
     setRenameValue('');
+  }
+
+  async function exportWaveform(song) {
+    try {
+      const resp = await fetch(song.audioUrl);
+      const buf = await resp.arrayBuffer();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const decoded = await ctx.decodeAudioData(buf);
+      ctx.close();
+      const data = decoded.getChannelData(0);
+
+      const W = 1200, H = 300;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const c = canvas.getContext('2d');
+
+      // Background
+      c.fillStyle = '#0a0a14';
+      c.fillRect(0, 0, W, H);
+
+      // Waveform
+      const step = Math.ceil(data.length / W);
+      const mid = H / 2;
+      for (let i = 0; i < W; i++) {
+        let min = 1, max = -1;
+        for (let j = 0; j < step && i * step + j < data.length; j++) {
+          const v = data[i * step + j];
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+        const hue = 270 + (i / W) * 60;
+        c.fillStyle = `hsl(${hue}, 80%, 65%)`;
+        const top = mid + min * mid * 0.85;
+        const bottom = mid + max * mid * 0.85;
+        c.fillRect(i, top, 1, bottom - top || 1);
+      }
+
+      // Song info
+      c.fillStyle = '#fff'; c.font = 'bold 18px Inter, sans-serif';
+      c.fillText(song.title, 16, 28);
+      c.fillStyle = '#888'; c.font = '13px Inter, sans-serif';
+      c.fillText(song.artist || 'Unknown Artist', 16, 48);
+      c.fillStyle = 'rgba(139,92,246,0.4)'; c.font = '10px Inter, sans-serif';
+      c.textAlign = 'right'; c.fillText('versefy', W - 12, H - 10); c.textAlign = 'left';
+
+      const link = document.createElement('a');
+      link.download = `${song.title}-waveform.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (e) {
+      alert('Could not export waveform: ' + e.message);
+    }
   }
 
   function playWithEffect(songsList, idx, effect) {
@@ -233,6 +285,9 @@ export default function SongList({ songs, onDelete, onSongUpdated, showIndex = t
                         setMenuOpen(null);
                       }}>
                         <IoDownload /> Save to disk
+                      </button>
+                      <button onClick={() => { exportWaveform(song); setMenuOpen(null); }}>
+                        <IoPulse /> Export Waveform
                       </button>
                       <button onClick={async () => {
                         if (window.electronAPI?.share) {

@@ -1,7 +1,9 @@
 import { IoLogoDiscord, IoHeart, IoShieldCheckmark, IoWarning, IoLockClosed, IoHandLeft, IoDocument, IoShield } from 'react-icons/io5';
+import { getCredit } from '../utils/integrity';
 import './Pages.css';
 
 export default function Info() {
+  const CREDIT = getCredit() || '⚠ CREDIT TAMPERED';
   return (
     <div className="page">
       <div className="page-header">
@@ -17,14 +19,14 @@ export default function Info() {
         </div>
         <p className="info-text">
           Versefy is a <strong>free, non-commercial music and SFX management application</strong> built
-          by <strong>Verse</strong>. It is distributed as free software for the community and is not a
+          by <strong>{CREDIT}</strong>. It is distributed as free software for the community and is not a
           commercial product, streaming service, or platform of any kind. Versefy does not host, stream,
           or provide access to any audio content &mdash; it is a local playback and file management tool only.
         </p>
         <div className="info-creator">
           <div className="info-creator-row">
             <span className="info-label">Created by</span>
-            <span className="info-value">Verse</span>
+            <span className="info-value">{CREDIT}</span>
           </div>
           <div className="info-creator-row">
             <span className="info-label">Twitter / X</span>
@@ -35,7 +37,7 @@ export default function Info() {
             <span className="info-value"><IoLogoDiscord style={{ verticalAlign: 'middle', marginRight: 4 }} /> verse_3d</span>
           </div>
         </div>
-        <button className="info-donate-btn" onClick={() => window.open('https://ko-fi.com/caze_', '_blank')}>
+        <button className="info-donate-btn" onClick={() => window.open('https://ko-fi.com/versefy', '_blank')}>
           <IoHeart /> Donate / Support
         </button>
       </div>
@@ -75,7 +77,7 @@ export default function Info() {
           <p>
             <strong>No Resale or Rebranding.</strong> You may not rebrand, rename, claim authorship of, or
             redistribute Versefy as your own product. All rights, ownership, and credit remain solely with the
-            original creator (Verse).
+            original creator ({CREDIT}).
           </p>
           <p>
             <strong>Strictly No NSFW Content.</strong> Versefy is not intended, designed, or permitted to be used
@@ -246,7 +248,7 @@ export default function Info() {
 
       <div className="info-footer">
         <span>Versefy &mdash; Free Music Player for the Community</span>
-        <span>Made with <IoHeart style={{ color: 'var(--accent)', verticalAlign: 'middle', fontSize: 14 }} /> by Verse</span>
+        <span>Made with <IoHeart style={{ color: 'var(--accent)', verticalAlign: 'middle', fontSize: 14 }} /> by {CREDIT}</span>
       </div>
     </div>
   );

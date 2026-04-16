@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   ytdlp: {
     download: (url) => ipcRenderer.invoke('yt-dlp:download', url),
+    downloadVideo: (url) => ipcRenderer.invoke('yt-dlp:download-video', url),
     check: () => ipcRenderer.invoke('yt-dlp:check'),
     cancel: () => ipcRenderer.send('yt-dlp:cancel'),
     onProgress: (cb) => {

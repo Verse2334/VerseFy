@@ -5,13 +5,15 @@ import { useNavigate } from 'react-router-dom';
 import {
   IoPlaySharp, IoPauseSharp, IoPlaySkipForwardSharp, IoPlaySkipBackSharp,
   IoRepeat, IoShuffle, IoVolumeHigh, IoVolumeMute, IoVolumeMedium, IoVolumeLow,
-  IoExpand, IoSpeedometer, IoHeart, IoHeartOutline, IoList, IoOptions, IoLeaf
+  IoExpand, IoSpeedometer, IoHeart, IoHeartOutline, IoList, IoOptions, IoLeaf, IoHeadset, IoMusicalNotes
 } from 'react-icons/io5';
 import { TbRepeatOnce } from 'react-icons/tb';
 import AmbientMixer from './AmbientMixer';
 import MiniWaveform from './MiniWaveform';
 import QueueView from './QueueView';
 import Equalizer from './Equalizer';
+import SpatialPad from './SpatialPad';
+import DJMode from './DJMode';
 import './Player.css';
 
 function formatTime(sec) {
@@ -54,6 +56,17 @@ export default function Player() {
   const navigate = useNavigate();
   const [isFav, setIsFav] = useState(false);
   const [showAmbient, setShowAmbient] = useState(false);
+  const [showSpatial, setShowSpatial] = useState(false);
+  const [showDJ, setShowDJ] = useState(false);
+  const [djEnabled, setDjEnabled] = useState(() => localStorage.getItem('versefy-dj-mode') === '1');
+  const [showVolInput, setShowVolInput] = useState(false);
+  const [volInputVal, setVolInputVal] = useState('');
+
+  useEffect(() => {
+    const handler = () => setDjEnabled(localStorage.getItem('versefy-dj-mode') === '1');
+    window.addEventListener('versefy-dj-mode-changed', handler);
+    return () => window.removeEventListener('versefy-dj-mode-changed', handler);
+  }, []);
   const artworkRingRef = useRef(null);
   const pulseAnimRef = useRef(null);
 
@@ -72,6 +85,7 @@ export default function Player() {
     const dataArray = new Uint8Array(analyserRef.current?.frequencyBinCount || 128);
 
     pulseAnimRef.current = setInterval(() => {
+      if (document.hidden) return; // skip when minimized — saves CPU+GPU
       const el = artworkRingRef.current;
       if (!el || !analyserRef.current) return;
 
@@ -225,6 +239,16 @@ export default function Player() {
             <IoLeaf />
           </button>
 
+          <button className={`control-btn small ${showSpatial ? 'active' : ''}`} onClick={() => setShowSpatial(!showSpatial)} title="Spatial Audio (3D)">
+            <IoHeadset />
+          </button>
+
+          {djEnabled && (
+            <button className={`control-btn small ${showDJ ? 'active' : ''}`} onClick={() => setShowDJ(true)} title="DJ Mode">
+              <IoMusicalNotes />
+            </button>
+          )}
+
           <button className={`control-btn small ${showQueue ? 'active' : ''}`} onClick={toggleQueue} title="Queue">
             <IoList />
           </button>
@@ -233,11 +257,39 @@ export default function Player() {
             <button className="control-btn small" onClick={toggleMute} title={isMuted ? 'Unmute' : 'Mute'}>
               <VolumeIcon />
             </button>
-            <div className="volume-bar" onMouseDown={volumeSlider.onMouseDown}>
+            <div
+              className="volume-bar"
+              onMouseDown={volumeSlider.onMouseDown}
+              onContextMenu={(e) => { e.preventDefault(); setVolInputVal(Math.round(volume * 100).toString()); setShowVolInput(true); }}
+              title="Right-click to enter exact %"
+            >
               <div className="volume-fill" style={{ width: `${(isMuted ? 0 : volume) * 100}%` }}>
                 <div className="volume-thumb" />
               </div>
             </div>
+            {showVolInput && (
+              <div className="vol-input-popup" onClick={e => e.stopPropagation()}>
+                <input
+                  type="number" min="0" max="100" autoFocus
+                  value={volInputVal}
+                  onChange={e => setVolInputVal(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const v = Math.max(0, Math.min(100, parseFloat(volInputVal) || 0));
+                      setVolume(v / 100);
+                      setShowVolInput(false);
+                    }
+                    if (e.key === 'Escape') setShowVolInput(false);
+                  }}
+                  onBlur={() => {
+                    const v = Math.max(0, Math.min(100, parseFloat(volInputVal) || 0));
+                    setVolume(v / 100);
+                    setShowVolInput(false);
+                  }}
+                />
+                <span>%</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -246,6 +298,8 @@ export default function Player() {
       <QueueView isOpen={showQueue} onClose={toggleQueue} />
       {showEQ && <Equalizer />}
       {showAmbient && <AmbientMixer onClose={() => setShowAmbient(false)} />}
+      {showSpatial && <SpatialPad onClose={() => setShowSpatial(false)} />}
+      {showDJ && <DJMode onClose={() => setShowDJ(false)} />}
     </>
   );
 }

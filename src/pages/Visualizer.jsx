@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { usePlayer } from '../context/PlayerContext';
 import { IoClose, IoEye, IoEyeOff, IoVolumeHigh } from 'react-icons/io5';
@@ -1068,314 +1069,264 @@ function drawAurora(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase
   }
 }
 
-// ===== DRAW: OCEAN (Tetris Effect inspired) =====
+// ===== DRAW: OCEAN (Tetris Effect Metamorphosis — constellation dolphins in space) =====
 function drawOcean(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, oceanState) {
-  // Init persistent state
-  if (!oceanState.dolphins) {
-    oceanState.dolphins = Array.from({ length: 4 }, (_, i) => ({
-      x: Math.random() * W, y: H * 0.3 + Math.random() * H * 0.4,
-      vx: 1.5 + Math.random() * 1.5, vy: 0,
-      size: 20 + Math.random() * 15, phase: Math.random() * Math.PI * 2,
-      hue: 180 + Math.random() * 60, trail: [],
-    }));
-    oceanState.plankton = Array.from({ length: 150 }, () => ({
+  if (!oceanState.init) {
+    oceanState.init = true;
+    // Starfield — dense, layered depths
+    oceanState.stars = Array.from({ length: 300 }, () => ({
       x: Math.random() * W, y: Math.random() * H,
-      vx: (Math.random() - 0.5) * 0.3, vy: -0.1 - Math.random() * 0.3,
-      size: 0.5 + Math.random() * 2, hue: 170 + Math.random() * 80,
-      phase: Math.random() * Math.PI * 2, bright: 0.2 + Math.random() * 0.5,
+      size: Math.random() * 2 + 0.3,
+      depth: 0.2 + Math.random() * 0.8, // parallax depth
+      phase: Math.random() * Math.PI * 2,
+      hue: 200 + Math.random() * 60,
     }));
-    oceanState.bubbles = [];
-    oceanState.jellyfish = Array.from({ length: 3 }, (_, i) => ({
-      x: W * (0.2 + i * 0.3), y: H * 0.5 + Math.random() * H * 0.3,
-      size: 25 + Math.random() * 20, phase: Math.random() * Math.PI * 2,
-      hue: 280 + Math.random() * 60, tentacles: 5 + Math.floor(Math.random() * 4),
-    }));
-    oceanState.rays = Array.from({ length: 5 }, (_, i) => ({
-      x: W * (0.1 + i * 0.2), width: 30 + Math.random() * 50,
-      phase: Math.random() * Math.PI * 2, speed: 0.2 + Math.random() * 0.3,
-    }));
+    // Two dolphins — made of particle constellations
+    oceanState.dolphins = [0, 1].map((_, i) => {
+      // Dolphin body defined as constellation points (relative coords)
+      const shape = [];
+      // Body outline
+      for (let a = 0; a < Math.PI * 2; a += 0.15) {
+        const rx = Math.cos(a) * 1.2 * (1 + 0.3 * Math.cos(a * 2));
+        const ry = Math.sin(a) * 0.45;
+        shape.push({ ox: rx, oy: ry, bright: 0.5 + Math.random() * 0.5 });
+      }
+      // Nose
+      shape.push({ ox: 1.5, oy: 0, bright: 1 });
+      shape.push({ ox: 1.3, oy: -0.1, bright: 0.8 });
+      shape.push({ ox: 1.3, oy: 0.1, bright: 0.8 });
+      // Dorsal fin
+      shape.push({ ox: 0.2, oy: -0.6, bright: 0.9 });
+      shape.push({ ox: 0, oy: -0.8, bright: 1 });
+      shape.push({ ox: -0.2, oy: -0.55, bright: 0.7 });
+      // Tail
+      shape.push({ ox: -1.4, oy: -0.35, bright: 0.9 });
+      shape.push({ ox: -1.6, oy: -0.5, bright: 0.7 });
+      shape.push({ ox: -1.4, oy: 0.35, bright: 0.9 });
+      shape.push({ ox: -1.6, oy: 0.5, bright: 0.7 });
+      // Internal sparkle points
+      for (let j = 0; j < 15; j++) {
+        shape.push({
+          ox: (Math.random() - 0.3) * 2, oy: (Math.random() - 0.5) * 0.7,
+          bright: 0.3 + Math.random() * 0.4,
+        });
+      }
+      return {
+        x: i === 0 ? W * 0.3 : W * 0.6,
+        y: H * 0.4 + i * H * 0.15,
+        vx: 0.8 + i * 0.3,
+        phase: i * Math.PI * 0.7,
+        size: 50 + i * 10,
+        shape,
+        trail: [],
+        hue: i === 0 ? 30 : 200,
+      };
+    });
+    oceanState.sparkles = [];
+    oceanState.pulses = [];
   }
 
-  // Deep ocean background with slow fade for trails
-  ctx.fillStyle = `rgba(2, 4, 15, ${0.06 + energy * 0.03})`;
+  // Deep space — very slow fade for long trails
+  ctx.fillStyle = `rgba(1, 1, 4, ${0.03 + energy * 0.02})`;
   ctx.fillRect(0, 0, W, H);
 
-  // Ocean depth gradient
-  const depthGrad = ctx.createLinearGradient(0, 0, 0, H);
-  depthGrad.addColorStop(0, `rgba(5, 15, 40, ${0.04 + mid * 0.03})`);
-  depthGrad.addColorStop(0.3, `rgba(3, 8, 25, ${0.02})`);
-  depthGrad.addColorStop(1, `rgba(1, 2, 8, ${0.03})`);
-  ctx.fillStyle = depthGrad;
-  ctx.fillRect(0, 0, W, H);
-
-  // God rays from above - react to treble
+  // Subtle nebula glow
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (const ray of oceanState.rays) {
-    const rx = ray.x + Math.sin(t * ray.speed + ray.phase) * 40;
-    const rw = ray.width + treble * 30 + Math.sin(t * 0.5 + ray.phase) * 15;
-    const rayGrad = ctx.createLinearGradient(rx, 0, rx, H * 0.8);
-    rayGrad.addColorStop(0, `rgba(100, 200, 255, ${0.04 + treble * 0.06 + energy * 0.03})`);
-    rayGrad.addColorStop(0.3, `rgba(60, 150, 220, ${0.02 + mid * 0.03})`);
-    rayGrad.addColorStop(0.7, `rgba(30, 80, 150, ${0.005 + energy * 0.01})`);
-    rayGrad.addColorStop(1, 'transparent');
-    ctx.beginPath();
-    ctx.moveTo(rx - rw / 2, 0);
-    ctx.lineTo(rx - rw * 0.8, H * 0.8);
-    ctx.lineTo(rx + rw * 0.8, H * 0.8);
-    ctx.lineTo(rx + rw / 2, 0);
-    ctx.fillStyle = rayGrad;
-    ctx.fill();
+  for (let i = 0; i < 3; i++) {
+    const nx = W * (0.25 + i * 0.25) + Math.sin(t * 0.08 + i * 2) * 60;
+    const ny = H * (0.35 + i * 0.15) + Math.cos(t * 0.06 + i) * 40;
+    const nr = 150 + energy * 100;
+    const nHue = (20 + i * 80 + hueBase * 0.1) % 360;
+    const nGrad = ctx.createRadialGradient(nx, ny, 0, nx, ny, nr);
+    nGrad.addColorStop(0, `hsla(${nHue}, 60%, 40%, ${0.015 + energy * 0.02})`);
+    nGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = nGrad;
+    ctx.beginPath(); ctx.arc(nx, ny, nr, 0, Math.PI * 2); ctx.fill();
   }
   ctx.restore();
 
-  // Plankton / bioluminescent particles
+  // Stars — parallax, twinkle with treble
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (const p of oceanState.plankton) {
-    p.x += p.vx + Math.sin(t * 0.8 + p.phase) * 0.4 * (1 + bass);
-    p.y += p.vy * (1 + energy * 2);
-    if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
-    if (p.x < -10) p.x = W + 10;
-    if (p.x > W + 10) p.x = -10;
+  for (const s of oceanState.stars) {
+    // Parallax movement — deeper stars move slower
+    s.x -= 0.15 * s.depth * (1 + energy * 2);
+    if (s.x < -5) { s.x = W + 5; s.y = Math.random() * H; }
 
-    const flicker = p.bright + Math.sin(t * 2 + p.phase) * 0.15 + energy * 0.4 + beat * 0.3;
-    const sz = p.size * (1 + bass * 1.5 + beat * 0.8);
+    const twinkle = 0.2 + Math.sin(t * 3 + s.phase) * 0.15 + treble * 0.5 + beat * 0.2;
+    const sz = s.size * (0.8 + energy * 0.6);
 
     // Glow
-    ctx.beginPath(); ctx.arc(p.x, p.y, sz * 4, 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${p.hue + hueBase * 0.3}, 80%, 65%, ${flicker * 0.06})`;
+    ctx.beginPath(); ctx.arc(s.x, s.y, sz * 3, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${s.hue}, 60%, 80%, ${twinkle * 0.04})`;
     ctx.fill();
     // Core
-    ctx.beginPath(); ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${p.hue + hueBase * 0.3}, 85%, 75%, ${Math.min(1, flicker * 0.7)})`;
+    ctx.beginPath(); ctx.arc(s.x, s.y, sz, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${s.hue}, 50%, 90%, ${Math.min(1, twinkle * 0.8)})`;
     ctx.fill();
-  }
-  ctx.restore();
-
-  // Jellyfish - graceful, pulsing with mid frequencies
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (const jf of oceanState.jellyfish) {
-    jf.y += Math.sin(t * 0.3 + jf.phase) * 0.5 - 0.15;
-    jf.x += Math.sin(t * 0.15 + jf.phase * 2) * 0.3;
-    if (jf.y < -60) jf.y = H + 60;
-
-    const pulse = 1 + Math.sin(t * 1.2 + jf.phase) * 0.15 + mid * 0.3;
-    const jSize = jf.size * pulse;
-    const jAlpha = 0.15 + mid * 0.2 + energy * 0.1;
-
-    // Bell (dome shape)
-    ctx.beginPath();
-    ctx.ellipse(jf.x, jf.y, jSize, jSize * 0.6, 0, Math.PI, 0);
-    const bellGrad = ctx.createRadialGradient(jf.x, jf.y - jSize * 0.2, 0, jf.x, jf.y, jSize);
-    bellGrad.addColorStop(0, `hsla(${jf.hue}, 70%, 70%, ${jAlpha * 0.8})`);
-    bellGrad.addColorStop(0.5, `hsla(${jf.hue + 20}, 60%, 55%, ${jAlpha * 0.4})`);
-    bellGrad.addColorStop(1, `hsla(${jf.hue + 40}, 50%, 40%, ${jAlpha * 0.1})`);
-    ctx.fillStyle = bellGrad;
-    ctx.fill();
-
-    // Glow around bell
-    ctx.beginPath(); ctx.arc(jf.x, jf.y - jSize * 0.1, jSize * 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = `hsla(${jf.hue}, 70%, 60%, ${jAlpha * 0.04})`;
-    ctx.fill();
-
-    // Tentacles - wave with the music
-    for (let ti = 0; ti < jf.tentacles; ti++) {
-      const tx = jf.x + (ti - jf.tentacles / 2 + 0.5) * (jSize * 0.3);
-      ctx.beginPath();
-      ctx.moveTo(tx, jf.y);
-      let cx = tx, cy = jf.y;
-      for (let seg = 0; seg < 6; seg++) {
-        cx += Math.sin(t * 1.5 + ti * 0.8 + seg * 0.6) * (4 + mid * 6);
-        cy += 6 + seg * 2 + bass * 3;
-        ctx.lineTo(cx, cy);
-      }
-      ctx.strokeStyle = `hsla(${jf.hue + 30}, 60%, 65%, ${jAlpha * 0.5 * (1 - 0)})`;
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+    // Cross sparkle on bright stars
+    if (s.size > 1.5 && twinkle > 0.5) {
+      const sLen = sz * 3;
+      ctx.strokeStyle = `hsla(${s.hue}, 50%, 85%, ${(twinkle - 0.4) * 0.15})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.moveTo(s.x - sLen, s.y); ctx.lineTo(s.x + sLen, s.y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(s.x, s.y - sLen); ctx.lineTo(s.x, s.y + sLen); ctx.stroke();
     }
   }
   ctx.restore();
 
-  // Dolphins - bioluminescent, trailing particles
+  // Dolphins — constellation style, made of glowing particles connected by faint lines
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const d of oceanState.dolphins) {
-    // Movement - graceful swimming with music influence
-    d.vy = Math.sin(t * 0.6 + d.phase) * 1.5 + Math.sin(t * 1.2 + d.phase * 2) * bass * 3;
-    const speedMult = 1 + energy * 1.5 + beat * 2;
-    d.x += d.vx * speedMult;
-    d.y += d.vy;
+    // Graceful swimming motion
+    const swimY = Math.sin(t * 0.5 + d.phase) * 40 + Math.sin(t * 0.8 + d.phase * 2) * bass * 50;
+    const swimX = Math.cos(t * 0.3 + d.phase) * 20;
+    d.x += d.vx * (1 + energy * 1.5 + beat * 2);
+    d.y += (swimY - (d.y - H * 0.45)) * 0.02;
 
-    // Wrap around
-    if (d.x > W + 80) { d.x = -80; d.y = H * 0.2 + Math.random() * H * 0.5; }
-    if (d.y < H * 0.1) d.y = H * 0.1;
-    if (d.y > H * 0.85) d.y = H * 0.85;
+    if (d.x > W + d.size * 2) { d.x = -d.size * 2; d.y = H * 0.3 + Math.random() * H * 0.35; }
 
-    // Trail
-    d.trail.push({ x: d.x, y: d.y, alpha: 0.6 + energy * 0.3 });
-    if (d.trail.length > 25) d.trail.shift();
+    const angle = Math.sin(t * 0.5 + d.phase) * 0.15 + Math.sin(t * 0.8 + d.phase) * bass * 0.2;
+    const sz = d.size + bass * 15 + beat * 8;
+    const tailWave = Math.sin(t * 2.5 + d.phase) * 0.25 + bass * 0.15;
 
-    // Draw trail - bioluminescent wake
-    for (let ti = 0; ti < d.trail.length - 1; ti++) {
+    // Trail of stardust
+    d.trail.push({ x: d.x - Math.cos(angle) * sz * 0.8, y: d.y - Math.sin(angle) * sz * 0.3, alpha: 0.5 + energy * 0.3, hue: d.hue });
+    if (d.trail.length > 40) d.trail.shift();
+
+    for (let ti = 0; ti < d.trail.length; ti++) {
       const tp = d.trail[ti];
       const frac = ti / d.trail.length;
-      tp.alpha *= 0.94;
-      ctx.beginPath(); ctx.arc(tp.x, tp.y, d.size * 0.4 * frac + 1, 0, Math.PI * 2);
-      ctx.fillStyle = `hsla(${d.hue}, 80%, 65%, ${tp.alpha * frac * 0.15})`;
+      tp.alpha *= 0.96;
+      const tSz = 1 + frac * 2;
+      ctx.beginPath(); ctx.arc(tp.x, tp.y, tSz, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${tp.hue + 20}, 70%, 70%, ${tp.alpha * frac * 0.12})`;
       ctx.fill();
     }
 
-    const angle = Math.atan2(d.vy, d.vx * speedMult);
-    const sz = d.size + bass * 8;
+    // Constellation points — transform each shape point
+    const cosA = Math.cos(angle), sinA = Math.sin(angle);
+    const points = d.shape.map(p => {
+      let oy = p.oy;
+      // Tail animation
+      if (p.ox < -0.8) oy += tailWave * (Math.abs(p.ox) - 0.8);
+      return {
+        x: d.x + (p.ox * cosA - oy * sinA) * sz,
+        y: d.y + (p.ox * sinA + oy * cosA) * sz,
+        bright: p.bright,
+      };
+    });
 
-    // Dolphin body - elegant curved shape
-    ctx.save();
-    ctx.translate(d.x, d.y);
-    ctx.rotate(angle);
+    // Draw constellation lines between nearby points
+    ctx.strokeStyle = `hsla(${d.hue + 20}, 60%, 65%, ${0.04 + energy * 0.06 + beat * 0.04})`;
+    ctx.lineWidth = 0.5 + energy;
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const dx = points[i].x - points[j].x;
+        const dy = points[i].y - points[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < sz * 0.6) {
+          const lineAlpha = (1 - dist / (sz * 0.6)) * (0.06 + energy * 0.08);
+          ctx.strokeStyle = `hsla(${d.hue + 20}, 60%, 70%, ${lineAlpha})`;
+          ctx.beginPath(); ctx.moveTo(points[i].x, points[i].y); ctx.lineTo(points[j].x, points[j].y); ctx.stroke();
+        }
+      }
+    }
 
-    // Body glow
-    const bodyGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, sz * 2);
-    bodyGlow.addColorStop(0, `hsla(${d.hue}, 80%, 65%, ${0.08 + energy * 0.08 + beat * 0.06})`);
-    bodyGlow.addColorStop(1, 'transparent');
-    ctx.fillStyle = bodyGlow;
-    ctx.beginPath(); ctx.arc(0, 0, sz * 2, 0, Math.PI * 2); ctx.fill();
+    // Draw constellation points (the dolphin's body made of stars)
+    for (const pt of points) {
+      const ptBright = pt.bright * (0.4 + energy * 0.6 + beat * 0.3);
+      const ptSize = 1.5 + pt.bright * 2 + bass * 1.5;
 
-    // Body shape
-    ctx.beginPath();
-    ctx.moveTo(sz * 1.2, 0); // nose
-    ctx.quadraticCurveTo(sz * 0.4, -sz * 0.5, -sz * 0.6, -sz * 0.25); // top curve
-    ctx.quadraticCurveTo(-sz * 1.2, 0, -sz * 0.6, sz * 0.25); // tail
-    ctx.quadraticCurveTo(sz * 0.4, sz * 0.5, sz * 1.2, 0); // bottom curve
-    const bodyGrad = ctx.createLinearGradient(-sz, -sz * 0.3, sz, sz * 0.3);
-    bodyGrad.addColorStop(0, `hsla(${d.hue + 20}, 70%, 55%, ${0.3 + energy * 0.3})`);
-    bodyGrad.addColorStop(0.5, `hsla(${d.hue}, 85%, 70%, ${0.5 + energy * 0.3 + beat * 0.2})`);
-    bodyGrad.addColorStop(1, `hsla(${d.hue - 10}, 70%, 50%, ${0.2 + energy * 0.2})`);
-    ctx.fillStyle = bodyGrad;
-    ctx.fill();
+      // Outer glow
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, ptSize * 4, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${d.hue + 15}, 70%, 70%, ${ptBright * 0.06})`;
+      ctx.fill();
+      // Inner glow
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, ptSize * 2, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${d.hue + 10}, 75%, 75%, ${ptBright * 0.12})`;
+      ctx.fill();
+      // Core star
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, ptSize, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${d.hue}, 50%, 90%, ${Math.min(1, ptBright * 0.8)})`;
+      ctx.fill();
+    }
 
-    // Dorsal fin
-    ctx.beginPath();
-    ctx.moveTo(sz * 0.1, -sz * 0.25);
-    ctx.quadraticCurveTo(sz * 0.15, -sz * 0.7, -sz * 0.2, -sz * 0.3);
-    ctx.fillStyle = `hsla(${d.hue}, 75%, 60%, ${0.25 + energy * 0.2})`;
-    ctx.fill();
+    // Overall dolphin glow aura
+    const auraGrad = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, sz * 1.8);
+    auraGrad.addColorStop(0, `hsla(${d.hue + 10}, 70%, 60%, ${0.02 + energy * 0.03 + beat * 0.02})`);
+    auraGrad.addColorStop(1, 'transparent');
+    ctx.fillStyle = auraGrad;
+    ctx.beginPath(); ctx.arc(d.x, d.y, sz * 1.8, 0, Math.PI * 2); ctx.fill();
 
-    // Tail fluke
-    const tailWave = Math.sin(t * 3 + d.phase) * 0.3;
-    ctx.beginPath();
-    ctx.moveTo(-sz * 0.8, 0);
-    ctx.quadraticCurveTo(-sz * 1.1, -sz * 0.4 + tailWave * sz, -sz * 1.4, -sz * 0.3 + tailWave * sz);
-    ctx.quadraticCurveTo(-sz * 1.1, tailWave * sz * 0.2, -sz * 1.4, sz * 0.3 + tailWave * sz);
-    ctx.quadraticCurveTo(-sz * 1.1, sz * 0.4 + tailWave * sz, -sz * 0.8, 0);
-    ctx.fillStyle = `hsla(${d.hue + 10}, 75%, 60%, ${0.2 + energy * 0.25})`;
-    ctx.fill();
-
-    // Bioluminescent edge highlight
-    ctx.beginPath();
-    ctx.moveTo(sz * 1.2, 0);
-    ctx.quadraticCurveTo(sz * 0.4, -sz * 0.5, -sz * 0.6, -sz * 0.25);
-    ctx.strokeStyle = `hsla(${d.hue + 30}, 90%, 80%, ${0.2 + bass * 0.4 + beat * 0.3})`;
-    ctx.lineWidth = 1.5 + energy * 2;
-    ctx.stroke();
-
-    ctx.restore();
-
-    // Sparkle particles emitted from dolphin on beats
-    if (beat > 0.4 && Math.random() > 0.5) {
-      for (let sp = 0; sp < 3; sp++) {
-        oceanState.plankton.push({
-          x: d.x + (Math.random() - 0.5) * sz, y: d.y + (Math.random() - 0.5) * sz,
-          vx: (Math.random() - 0.5) * 1.5, vy: (Math.random() - 0.5) * 1.5 - 0.5,
-          size: 1 + Math.random() * 2, hue: d.hue + Math.random() * 30,
-          phase: Math.random() * Math.PI * 2, bright: 0.6 + Math.random() * 0.4,
+    // Sparkle burst on beats
+    if (beat > 0.4 && Math.random() > 0.4) {
+      for (let sp = 0; sp < 5; sp++) {
+        oceanState.sparkles.push({
+          x: d.x + (Math.random() - 0.5) * sz * 1.5,
+          y: d.y + (Math.random() - 0.5) * sz * 0.8,
+          vx: (Math.random() - 0.5) * 3, vy: (Math.random() - 0.5) * 3,
+          size: 1 + Math.random() * 2, alpha: 0.7 + Math.random() * 0.3,
+          hue: d.hue + Math.random() * 40 - 20,
         });
-        // Keep plankton count bounded
-        if (oceanState.plankton.length > 250) oceanState.plankton.shift();
       }
     }
   }
   ctx.restore();
 
-  // Bubbles - rise on beats
-  if (beat > 0.3) {
-    for (let i = 0; i < 3 + Math.floor(beat * 5); i++) {
-      oceanState.bubbles.push({
-        x: Math.random() * W, y: H + 10,
-        vy: -1 - Math.random() * 2, size: 2 + Math.random() * 5,
-        alpha: 0.3 + Math.random() * 0.3, wobble: Math.random() * Math.PI * 2,
-      });
-    }
+  // Free-floating sparkle particles
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = oceanState.sparkles.length - 1; i >= 0; i--) {
+    const sp = oceanState.sparkles[i];
+    sp.x += sp.vx * 0.8; sp.y += sp.vy * 0.8;
+    sp.vx *= 0.97; sp.vy *= 0.97;
+    sp.alpha *= 0.95;
+    if (sp.alpha < 0.02) { oceanState.sparkles.splice(i, 1); continue; }
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.size * 3, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${sp.hue}, 70%, 70%, ${sp.alpha * 0.1})`;
+    ctx.fill();
+    ctx.beginPath(); ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${sp.hue}, 60%, 90%, ${sp.alpha * 0.6})`;
+    ctx.fill();
+  }
+  if (oceanState.sparkles.length > 200) oceanState.sparkles.splice(0, 50);
+  ctx.restore();
+
+  // Beat pulse rings expanding from center
+  if (beat > 0.4) {
+    oceanState.pulses.push({ r: 5, alpha: 0.15 + beat * 0.1, hue: hueBase + 20 });
   }
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (let i = oceanState.bubbles.length - 1; i >= 0; i--) {
-    const b = oceanState.bubbles[i];
-    b.y += b.vy * (1 + energy);
-    b.x += Math.sin(t * 2 + b.wobble) * 0.5;
-    b.alpha *= 0.995;
-    if (b.y < -20 || b.alpha < 0.02) { oceanState.bubbles.splice(i, 1); continue; }
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(150, 220, 255, ${b.alpha * 0.4})`;
-    ctx.lineWidth = 1;
+  for (let i = oceanState.pulses.length - 1; i >= 0; i--) {
+    const p = oceanState.pulses[i];
+    p.r += 3 + energy * 4;
+    p.alpha *= 0.96;
+    if (p.alpha < 0.01) { oceanState.pulses.splice(i, 1); continue; }
+    ctx.beginPath(); ctx.arc(W / 2, H / 2, p.r, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${p.hue}, 50%, 70%, ${p.alpha})`;
+    ctx.lineWidth = 1 + p.alpha * 3;
     ctx.stroke();
-    // Highlight
-    ctx.beginPath(); ctx.arc(b.x - b.size * 0.25, b.y - b.size * 0.25, b.size * 0.3, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(200, 240, 255, ${b.alpha * 0.3})`;
-    ctx.fill();
   }
   ctx.restore();
 
-  // Frequency wave along the bottom — ocean floor bioluminescence
+  // Frequency bars along the very bottom — subtle
   if (data) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const floorY = H * 0.92;
-    for (let w = 0; w < 2; w++) {
-      ctx.beginPath();
-      for (let x = 0; x < W; x += 2) {
-        const di = Math.floor((x / W) * (data.length * 0.5));
-        const val = (data[di] || 0) / 255;
-        const y = floorY + Math.sin(x * 0.008 + t * 0.5 + w) * (8 + val * 20)
-          + Math.sin(x * 0.02 + t * 0.8) * (4 + mid * 8);
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      }
-      const wHue = 180 + w * 40 + hueBase * 0.2;
-      ctx.strokeStyle = `hsla(${wHue}, 75%, 55%, ${0.04 + energy * 0.06 + bass * 0.03})`;
-      ctx.lineWidth = 2 + energy * 2;
-      ctx.stroke();
+    const barCount = 80;
+    const barW = W / barCount;
+    for (let i = 0; i < barCount; i++) {
+      const di = Math.floor((i / barCount) * data.length * 0.5);
+      const val = (data[di] || 0) / 255;
+      const barH = val * 30 * energy;
+      if (barH < 1) continue;
+      ctx.fillStyle = `hsla(${30 + i * 2}, 60%, 65%, ${val * 0.04})`;
+      ctx.fillRect(i * barW, H - barH, barW - 0.5, barH);
     }
-    ctx.restore();
-  }
-
-  // Ambient floating light orbs in the deep
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 5; i++) {
-    const ox = W * (0.1 + i * 0.2) + Math.sin(t * 0.15 + i * 1.3) * 80;
-    const oy = H * (0.5 + i * 0.08) + Math.cos(t * 0.1 + i * 0.9) * 60;
-    const or = 40 + energy * 80 + bass * 40;
-    const oHue = 190 + i * 25 + hueBase * 0.2;
-    const oGrad = ctx.createRadialGradient(ox, oy, 0, ox, oy, or);
-    oGrad.addColorStop(0, `hsla(${oHue}, 70%, 55%, ${0.03 + energy * 0.04 + beat * 0.03})`);
-    oGrad.addColorStop(0.5, `hsla(${oHue + 20}, 60%, 45%, ${0.01 + mid * 0.02})`);
-    oGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = oGrad;
-    ctx.beginPath(); ctx.arc(ox, oy, or, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.restore();
-
-  // Beat flash — subtle underwater pulse
-  if (beat > 0.5) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const flashGrad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
-    flashGrad.addColorStop(0, `rgba(80, 180, 255, ${beat * 0.03})`);
-    flashGrad.addColorStop(0.5, `rgba(100, 160, 240, ${beat * 0.015})`);
-    flashGrad.addColorStop(1, 'transparent');
-    ctx.fillStyle = flashGrad;
-    ctx.fillRect(0, 0, W, H);
     ctx.restore();
   }
 }
@@ -1394,29 +1345,61 @@ export default function Visualizer() {
   const earthStateRef = useRef({});
   const cityStateRef = useRef({});
   const oceanStateRef = useRef({});
+  // Radial is the default — other themes are lazy (click to run, click active one again to stop).
   const [vizTheme, setVizTheme] = useState('radial');
 
-  // Store theme in ref so draw loop sees latest
-  const themeRef = useRef(vizTheme);
-  useEffect(() => { themeRef.current = vizTheme; }, [vizTheme]);
-
+  // Canvas setup runs once (doesn't depend on theme).
+  // We cap the *rendered* canvas resolution at ~1920px and CSS-scale it to fill
+  // the window. A music visualizer doesn't need native 4K pixels — this cuts
+  // GPU fill-rate work ~4× on a 4K display with zero perceptible difference.
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    function resize() {
+      const MAX = 1920;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const scale = Math.min(1, MAX / Math.max(w, h));
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+    }
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+
+  // Animation loop — only runs while a theme is selected
+  useEffect(() => {
+    if (!vizTheme) {
+      // Clear canvas so the previous theme doesn't linger when user deselects
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
     ensureAudioGraph();
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-    resize();
-    window.addEventListener('resize', resize);
-
-    particlesRef.current = initParticles(canvas.width, canvas.height);
-    starsRef.current = initStars(canvas.width, canvas.height);
+    // Lazy-init per-theme state only for the active theme
+    if (!particlesRef.current.length) particlesRef.current = initParticles(canvas.width, canvas.height);
+    if (!starsRef.current.length) starsRef.current = initStars(canvas.width, canvas.height);
 
     const analyser = analyserRef.current;
     const dataArray = analyser ? new Uint8Array(analyser.frequencyBinCount) : null;
+    let cancelled = false;
 
     function draw() {
+      if (cancelled) return;
+      // Pause when window is hidden/minimized
+      if (document.hidden) { animRef.current = requestAnimationFrame(draw); return; }
+
       const W = canvas.width, H = canvas.height;
       const t = timeRef.current += 0.016;
 
@@ -1424,12 +1407,10 @@ export default function Visualizer() {
       if (analyser && dataArray) {
         analyser.getByteFrequencyData(dataArray);
         const len = dataArray.length;
-        // Wider bass range (0-15%) and amplified values
         for (let i = 0; i < len * 0.15; i++) bass += dataArray[i]; bass /= (len * 0.15 * 255);
         for (let i = Math.floor(len * 0.15); i < len * 0.45; i++) mid += dataArray[i]; mid /= (len * 0.3 * 255);
         for (let i = Math.floor(len * 0.45); i < len; i++) treble += dataArray[i]; treble /= (len * 0.55 * 255);
         for (let i = 0; i < len; i++) energy += dataArray[i]; energy /= (len * 255);
-        // Amplify — most songs don't hit full range
         bass = Math.min(1, bass * 1.8);
         mid = Math.min(1, mid * 1.5);
         treble = Math.min(1, treble * 1.6);
@@ -1437,14 +1418,13 @@ export default function Visualizer() {
       }
 
       const bassJump = bass - prevBassRef.current;
-      // Lower threshold = catch more beats, slower decay = beats last longer visually
       if (bassJump > 0.04) beatRef.current = Math.min(1, beatRef.current + 0.6 + bassJump * 3);
       else beatRef.current *= 0.88;
       prevBassRef.current = bass;
       const beat = beatRef.current;
       const hueBase = (t * 15) % 360;
 
-      switch (themeRef.current) {
+      switch (vizTheme) {
         case 'bars': drawBars(ctx, W, H, t, dataArray, bass, mid, treble, energy, beat, hueBase); break;
         case 'wave': drawWave(ctx, W, H, t, dataArray, bass, mid, treble, energy, beat, hueBase, particlesRef.current); break;
         case 'galaxy': drawGalaxy(ctx, W, H, t, dataArray, bass, mid, treble, energy, beat, hueBase, starsRef.current); break;
@@ -1452,6 +1432,7 @@ export default function Visualizer() {
         case 'city': drawCity(ctx, W, H, t, dataArray, bass, mid, treble, energy, beat, hueBase, cityStateRef.current); break;
         case 'aurora': drawAurora(ctx, W, H, t, dataArray, bass, mid, treble, energy, beat, hueBase, starsRef.current); break;
         case 'ocean': drawOcean(ctx, W, H, t, dataArray, bass, mid, treble, energy, beat, hueBase, oceanStateRef.current); break;
+        case 'radial':
         default: drawRadial(ctx, W, H, t, dataArray, bass, mid, treble, energy, beat, hueBase, particlesRef.current, starsRef.current); break;
       }
 
@@ -1459,10 +1440,13 @@ export default function Visualizer() {
     }
 
     animRef.current = requestAnimationFrame(draw);
-    return () => { window.removeEventListener('resize', resize); if (animRef.current) cancelAnimationFrame(animRef.current); };
-  }, [analyserRef, ensureAudioGraph]);
+    return () => {
+      cancelled = true;
+      if (animRef.current) { cancelAnimationFrame(animRef.current); animRef.current = null; }
+    };
+  }, [vizTheme, analyserRef, ensureAudioGraph]);
 
-  return (
+  return createPortal(
     <div className="visualizer-overlay">
       <canvas ref={canvasRef} className="visualizer-canvas" />
 
@@ -1475,6 +1459,13 @@ export default function Visualizer() {
       ) : !currentSong ? (
         <div className="visualizer-no-song">Play a song to see the magic</div>
       ) : null}
+
+      {!vizTheme && (
+        <div className="visualizer-idle">
+          <div className="visualizer-idle-title">Pick a visualizer below</div>
+          <div className="visualizer-idle-sub">Nothing runs until you choose one.</div>
+        </div>
+      )}
 
       {/* Controls — top left */}
       <div className="viz-controls">
@@ -1490,15 +1481,24 @@ export default function Visualizer() {
       </div>
 
       <div className="viz-themes">
-        {['Radial', 'Bars', 'Wave', 'Galaxy', 'Earth', 'City', 'Aurora', 'Ocean'].map(t => (
-          <button key={t} className={`viz-theme-btn ${vizTheme === t.toLowerCase() ? 'active' : ''}`}
-            onClick={() => setVizTheme(t.toLowerCase())}>{t}</button>
-        ))}
+        {['Radial', 'Bars', 'Wave', 'Galaxy', 'Earth', 'City', 'Aurora', 'Ocean'].map(t => {
+          const key = t.toLowerCase();
+          const active = vizTheme === key;
+          return (
+            <button
+              key={t}
+              className={`viz-theme-btn ${active ? 'active' : ''}`}
+              onClick={() => setVizTheme(active ? null : key)}
+              title={active ? `Click to stop ${t}` : `Start ${t}`}
+            >{t}</button>
+          );
+        })}
       </div>
 
       <button className="visualizer-close-btn" onClick={() => navigate(-1)} title="Close">
         <IoClose />
       </button>
-    </div>
+    </div>,
+    document.body
   );
 }

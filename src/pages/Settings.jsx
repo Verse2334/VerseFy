@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { IoKeypad, IoRefresh, IoRadioButtonOn, IoColorPalette, IoCode, IoCopy, IoCloudDownload, IoCloudUpload, IoTrash, IoEye, IoPerson, IoText, IoContrast, IoHardwareChip, IoTv } from 'react-icons/io5';
+import { IoKeypad, IoRefresh, IoRadioButtonOn, IoColorPalette, IoCode, IoCopy, IoCloudDownload, IoCloudUpload, IoTrash, IoEye, IoPerson, IoText, IoContrast, IoHardwareChip, IoTv, IoVideocam, IoLogoYoutube, IoMusicalNotes } from 'react-icons/io5';
 import { useTheme } from '../context/ThemeContext';
 import { usePlayer } from '../context/PlayerContext';
 import { findDuplicates, exportLibrary, importLibrary, deleteCompletely } from '../utils/db';
+import { getConfig as getVideoBgConfig, saveConfig as saveVideoBgConfig, addVideo, getAllVideos, deleteVideo, setActiveVideo, extractYouTubeId, formatBytes, onConfigChange as onVideoBgChange } from '../utils/videoBg';
 import './Pages.css';
 import './Settings.css';
 
@@ -35,6 +36,13 @@ export default function Settings() {
   const [selectedDevice, setSelectedDevice] = useState(() => localStorage.getItem('versefy-audio-device') || 'default');
   const [obsRunning, setObsRunning] = useState(false);
   const [obsUrl, setObsUrl] = useState('');
+  const [djModeEnabled, setDjModeEnabled] = useState(() => localStorage.getItem('versefy-dj-mode') === '1');
+  const [videoBg, setVideoBg] = useState(getVideoBgConfig);
+  const [videoLibrary, setVideoLibrary] = useState([]);
+  const [videoBgMsg, setVideoBgMsg] = useState('');
+  const [ytVideoUrl, setYtVideoUrl] = useState('');
+  const [ytDownloading, setYtDownloading] = useState(false);
+  const [ytProgress, setYtProgress] = useState('');
 
   // Check OBS overlay status
   useEffect(() => {
@@ -68,6 +76,97 @@ export default function Settings() {
   useEffect(() => {
     applyCustomCSS(customCSS);
   }, []);
+
+  function updateVideoBg(partial) {
+    const next = { ...videoBg, ...partial };
+    setVideoBg(next);
+    saveVideoBgConfig(next);
+  }
+
+  async function refreshVideoLibrary() {
+    try { setVideoLibrary(await getAllVideos()); } catch {}
+  }
+
+  useEffect(() => {
+    refreshVideoLibrary();
+    return onVideoBgChange(() => {
+      setVideoBg(getVideoBgConfig());
+      refreshVideoLibrary();
+    });
+  }, []);
+
+  async function handleVideoBgFileUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('video/')) { setVideoBgMsg('Please choose a video file'); return; }
+    const MAX = 4 * 1024 * 1024 * 1024; // 4 GB
+    if (file.size > MAX) {
+      setVideoBgMsg(`File too large (${formatBytes(file.size)}). Max is 4 GB.`);
+      setTimeout(() => setVideoBgMsg(''), 4000);
+      return;
+    }
+    try {
+      const id = await addVideo({ blob: file, name: file.name, mime: file.type, source: 'file' });
+      setActiveVideo(id);
+      setVideoBgMsg(`Added "${file.name}" to library`);
+      setTimeout(() => setVideoBgMsg(''), 2500);
+    } catch (err) {
+      setVideoBgMsg('Could not save video: ' + err.message);
+    }
+  }
+
+  async function handleYoutubeDownload() {
+    const url = ytVideoUrl.trim();
+    const id = extractYouTubeId(url);
+    if (!id) { setVideoBgMsg('Please paste a valid YouTube URL'); return; }
+    if (!window.electronAPI?.ytdlp?.downloadVideo) {
+      setVideoBgMsg('YouTube download only works in the desktop app.');
+      return;
+    }
+    setYtDownloading(true);
+    setYtProgress('Preparing...');
+    const unsub = window.electronAPI.ytdlp.onProgress(msg => setYtProgress(msg));
+    try {
+      const result = await window.electronAPI.ytdlp.downloadVideo(url);
+      const blob = new Blob([result.bytes], { type: result.mime || 'video/mp4' });
+      const MAX = 4 * 1024 * 1024 * 1024;
+      if (blob.size > MAX) {
+        setVideoBgMsg(`Downloaded video too large (${formatBytes(blob.size)}). Max is 4 GB.`);
+        setTimeout(() => setVideoBgMsg(''), 4000);
+        return;
+      }
+      const newId = await addVideo({
+        blob,
+        name: result.title || 'YouTube video',
+        mime: result.mime,
+        source: 'youtube',
+        ytUrl: url,
+      });
+      setActiveVideo(newId);
+      setYtVideoUrl('');
+      setVideoBgMsg(`Downloaded "${result.title}" (${formatBytes(blob.size)})`);
+      setTimeout(() => setVideoBgMsg(''), 3000);
+    } catch (err) {
+      setVideoBgMsg('Download failed: ' + (err.message || err));
+    } finally {
+      setYtDownloading(false);
+      setYtProgress('');
+      try { unsub && unsub(); } catch {}
+    }
+  }
+
+  async function handleSelectVideo(id) {
+    setActiveVideo(id);
+    updateVideoBg({ enabled: true, activeVideoId: id });
+  }
+
+  async function handleDeleteVideo(id, name) {
+    if (!window.confirm(`Remove "${name}" from the video library?`)) return;
+    await deleteVideo(id);
+    setVideoBgMsg(`Removed "${name}"`);
+    setTimeout(() => setVideoBgMsg(''), 2000);
+  }
 
   function applyCustomCSS(css) {
     let el = document.getElementById('versefy-custom-css');
@@ -287,6 +386,135 @@ export default function Settings() {
         </div>
       </section>
 
+      {/* DJ Mode */}
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <IoMusicalNotes className="settings-icon" />
+          <div>
+            <h2>DJ Mode</h2>
+            <p>Unlock a 2-deck mixer with a crossfader — blend into your next track while the current one plays.</p>
+          </div>
+        </div>
+        <label className="videobg-enable">
+          <input
+            type="checkbox"
+            checked={djModeEnabled}
+            onChange={e => {
+              const on = e.target.checked;
+              setDjModeEnabled(on);
+              localStorage.setItem('versefy-dj-mode', on ? '1' : '0');
+              window.dispatchEvent(new CustomEvent('versefy-dj-mode-changed'));
+            }}
+          />
+          <span>Enable DJ Mode (adds a DJ button to the player)</span>
+        </label>
+      </section>
+
+      {/* Video Background */}
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <IoVideocam className="settings-icon" />
+          <div>
+            <h2>Video Background</h2>
+            <p>Download a YouTube video or upload your own to play behind the app. Max 4 GB.</p>
+          </div>
+        </div>
+
+        <div className="videobg-row">
+          <label className="videobg-enable">
+            <input
+              type="checkbox"
+              checked={videoBg.enabled}
+              onChange={e => updateVideoBg({ enabled: e.target.checked })}
+            />
+            <span>Enable video background</span>
+          </label>
+        </div>
+
+        {/* YouTube downloader */}
+        <div className="videobg-yt-row">
+          <div className="videobg-yt-input-wrap">
+            <IoLogoYoutube style={{ color: '#ff0033', fontSize: 18, flexShrink: 0 }} />
+            <input
+              type="text"
+              className="videobg-input"
+              placeholder="Paste a YouTube URL to download..."
+              value={ytVideoUrl}
+              onChange={e => setYtVideoUrl(e.target.value)}
+              disabled={ytDownloading}
+            />
+          </div>
+          <button
+            className="videobg-download-btn"
+            onClick={handleYoutubeDownload}
+            disabled={ytDownloading || !extractYouTubeId(ytVideoUrl)}
+          >
+            <IoCloudDownload /> {ytDownloading ? 'Downloading…' : 'Download'}
+          </button>
+        </div>
+        {ytProgress && <div className="videobg-progress">{ytProgress}</div>}
+
+        {/* File upload */}
+        <div className="videobg-upload-row">
+          <input
+            type="file"
+            accept="video/*"
+            id="videobg-file"
+            className="videobg-file-input"
+            onChange={handleVideoBgFileUpload}
+          />
+          <label htmlFor="videobg-file" className="videobg-upload">
+            <IoCloudUpload /> Or upload your own video
+          </label>
+        </div>
+
+        {/* Library */}
+        {videoLibrary.length > 0 && (
+          <div className="videobg-library">
+            <div className="videobg-library-label">Your videos ({videoLibrary.length})</div>
+            <div className="videobg-library-grid">
+              {videoLibrary.map(v => (
+                <div
+                  key={v.id}
+                  className={`videobg-card ${videoBg.activeVideoId === v.id ? 'active' : ''}`}
+                  onClick={() => handleSelectVideo(v.id)}
+                  title={v.name}
+                >
+                  <div className="videobg-card-icon">
+                    {v.source === 'youtube' ? <IoLogoYoutube /> : <IoVideocam />}
+                  </div>
+                  <div className="videobg-card-info">
+                    <div className="videobg-card-name">{v.name}</div>
+                    <div className="videobg-card-meta">
+                      {v.source === 'youtube' ? 'YouTube' : 'Uploaded'} · {formatBytes(v.size)}
+                    </div>
+                  </div>
+                  <button
+                    className="videobg-card-delete"
+                    onClick={(e) => { e.stopPropagation(); handleDeleteVideo(v.id, v.name); }}
+                    title="Remove"
+                  >
+                    <IoTrash />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="videobg-opacity">
+          <label>Video opacity</label>
+          <input
+            type="range" min="0" max="1" step="0.05"
+            value={videoBg.opacity}
+            onChange={e => updateVideoBg({ opacity: parseFloat(e.target.value) })}
+          />
+          <span>{Math.round(videoBg.opacity * 100)}%</span>
+        </div>
+
+        {videoBgMsg && <div className="settings-notice">{videoBgMsg}</div>}
+      </section>
+
       {/* Keybinds */}
       <section className="settings-section">
         <div className="settings-section-header">
@@ -421,6 +649,25 @@ export default function Settings() {
               onClick={() => handleFontChange(f)}>{f}</button>
           ))}
         </div>
+      </section>
+
+      {/* Song Change Notification */}
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <IoEye className="settings-icon" />
+          <div>
+            <h2>Song Notification</h2>
+            <p>Show a toast when the song changes</p>
+          </div>
+        </div>
+        <button className={`keybind-btn ${localStorage.getItem('versefy-song-toast') !== 'false' ? 'active' : ''}`}
+          onClick={() => {
+            const cur = localStorage.getItem('versefy-song-toast') !== 'false';
+            localStorage.setItem('versefy-song-toast', cur ? 'false' : 'true');
+            window.location.reload();
+          }}>
+          {localStorage.getItem('versefy-song-toast') !== 'false' ? 'Enabled' : 'Disabled'}
+        </button>
       </section>
 
       {/* Theater Mode */}

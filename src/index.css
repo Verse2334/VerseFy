@@ -176,3 +176,20 @@ body.theater-mode .theater-exit:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
 }
+
+/* ===== Video background active — make layers transparent so video shows through ===== */
+body.video-bg-active {
+  background: transparent;
+}
+
+body.video-bg-active .app-content {
+  background: rgba(10, 10, 16, 0.72);
+}
+
+body.video-bg-active .sidebar {
+  background: rgba(10, 10, 16, 0.72);
+}
+
+body.video-bg-active .player {
+  background: linear-gradient(180deg, rgba(14, 14, 22, 0.92) 0%, rgba(6, 6, 9, 0.96) 100%);
+}

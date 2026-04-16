@@ -169,30 +169,33 @@ ipcMain.handle('yt-dlp:download', async (event, url) => {
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
   try { for (const f of fs.readdirSync(tmpDir)) { try { fs.unlinkSync(path.join(tmpDir, f)); } catch {} } } catch {}
 
-  // Phase 1: metadata (15s timeout - should take 3-5s)
+  // Phase 1: metadata (60s timeout — YouTube player extraction can be slow)
   progress(event, 'Getting video info...');
   let info;
   try {
     const out = await ytdlpRun([
       '--print', '%(title)s|||%(uploader)s|||%(duration)s|||%(thumbnail)s',
-      '--no-download', url
-    ], { timeout: 15000 });
+      '--no-download', '--no-warnings', url
+    ], { timeout: 60000 });
     const parts = out.trim().split('|||');
     info = { title: parts[0] || 'Unknown', artist: parts[1] || 'Unknown', duration: parseFloat(parts[2]) || 0, thumbnail: parts[3] || null };
     progress(event, `Found: "${info.title}"`);
   } catch (e) {
     progress(event, '');
-    throw new Error('Could not get video info.\n' + e.message);
+    const hint = /timed out/i.test(e.message)
+      ? '\n\nTip: YouTube frequently changes its player — your yt-dlp may be out of date.\nRun "yt-dlp -U" in a terminal, or reinstall via Install-Versefy-Dependencies.bat.'
+      : '';
+    throw new Error('Could not get video info.\n' + e.message + hint);
   }
 
-  // Phase 2: download + convert (120s timeout for long videos)
+  // Phase 2: download + convert (5 min timeout for long videos)
   progress(event, `Downloading "${info.title}"...`);
   try {
     await ytdlpRun([
       '-x', '--audio-format', 'mp3', '--audio-quality', '0', '--newline',
       '-o', path.join(tmpDir, '%(title)s.%(ext)s'), url
     ], {
-      timeout: 120000,
+      timeout: 300000,
       onData: (text) => {
         const pct = text.match(/(\d+\.?\d*)%/);
         if (pct) progress(event, `Downloading... ${Math.round(parseFloat(pct[1]))}%`);
@@ -202,7 +205,10 @@ ipcMain.handle('yt-dlp:download', async (event, url) => {
     });
   } catch (e) {
     progress(event, '');
-    throw new Error('Download failed.\n' + e.message);
+    const hint = /timed out/i.test(e.message)
+      ? '\n\nTip: update yt-dlp ("yt-dlp -U") — YouTube player changes can stall old versions.'
+      : '';
+    throw new Error('Download failed.\n' + e.message + hint);
   }
 
   // Phase 3: read file
@@ -219,6 +225,75 @@ ipcMain.handle('yt-dlp:download', async (event, url) => {
 
   progress(event, 'Done!');
   return { title: info.title, artist: info.artist, duration: info.duration, thumbnail: info.thumbnail, audioUrl };
+});
+
+// Download a YouTube video (video-only, for background use) — returns bytes + metadata
+ipcMain.handle('yt-dlp:download-video', async (event, url) => {
+  if (activeProc) { try { activeProc.kill(); } catch {} activeProc = null; }
+
+  const tmpDir = path.join(app.getPath('temp'), 'versefy-yt-video');
+  if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+  try { for (const f of fs.readdirSync(tmpDir)) { try { fs.unlinkSync(path.join(tmpDir, f)); } catch {} } } catch {}
+
+  // Phase 1: metadata
+  progress(event, 'Getting video info...');
+  let info;
+  try {
+    const out = await ytdlpRun([
+      '--print', '%(title)s|||%(uploader)s|||%(duration)s|||%(thumbnail)s',
+      '--no-download', '--no-warnings', url
+    ], { timeout: 60000 });
+    const parts = out.trim().split('|||');
+    info = { title: parts[0] || 'Unknown', artist: parts[1] || 'Unknown', duration: parseFloat(parts[2]) || 0, thumbnail: parts[3] || null };
+    progress(event, `Found: "${info.title}"`);
+  } catch (e) {
+    progress(event, '');
+    throw new Error('Could not get video info.\n' + e.message);
+  }
+
+  // Phase 2: download video-only stream (smaller than combined, no audio needed for bg)
+  // Prefer mp4 <= 720p to keep file size reasonable.
+  progress(event, `Downloading video: "${info.title}"...`);
+  try {
+    await ytdlpRun([
+      '-f', 'bv*[height<=720][ext=mp4]/bv*[height<=720]/best[height<=720]/best',
+      '--newline',
+      '-o', path.join(tmpDir, 'bgvideo.%(ext)s'), url
+    ], {
+      timeout: 600000, // 10 min for large videos
+      onData: (text) => {
+        const pct = text.match(/(\d+\.?\d*)%/);
+        if (pct) progress(event, `Downloading... ${Math.round(parseFloat(pct[1]))}%`);
+        else if (text.includes('Merger')) progress(event, 'Merging streams...');
+      },
+    });
+  } catch (e) {
+    progress(event, '');
+    throw new Error('Video download failed.\n' + e.message);
+  }
+
+  // Phase 3: read file bytes
+  progress(event, 'Saving video...');
+  const files = fs.readdirSync(tmpDir);
+  const videoFile = files.find(f => /\.(mp4|webm|mkv|mov)$/i.test(f));
+  if (!videoFile) throw new Error('No video file found. Files: ' + files.join(', '));
+
+  const filePath = path.join(tmpDir, videoFile);
+  const bytes = fs.readFileSync(filePath);
+  const ext = path.extname(videoFile).slice(1).toLowerCase();
+  const mime = ext === 'webm' ? 'video/webm' : ext === 'mkv' ? 'video/x-matroska' : ext === 'mov' ? 'video/quicktime' : 'video/mp4';
+  try { fs.unlinkSync(filePath); } catch {}
+
+  progress(event, 'Done!');
+  return {
+    title: info.title,
+    artist: info.artist,
+    duration: info.duration,
+    thumbnail: info.thumbnail,
+    mime,
+    ext,
+    bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), // ArrayBuffer for renderer
+  };
 });
 
 ipcMain.handle('yt-dlp:check', async () => {

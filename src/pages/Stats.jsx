@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { getAllSongs, getAllPlaylists, createPlaylist, updatePlaylist } from '../utils/db';
 import { usePlayer } from '../context/PlayerContext';
-import { IoPlay, IoTrophy, IoTime, IoMusicalNote, IoRibbon, IoImage, IoList, IoTimer } from 'react-icons/io5';
+import { IoPlay, IoTrophy, IoTime, IoMusicalNote, IoRibbon, IoImage, IoList, IoTimer, IoSparkles, IoCalendar } from 'react-icons/io5';
 import { v4 as uuidv4 } from 'uuid';
+import { getLifetimeSec, migrateLegacyListening, getWrappedWindowStatus } from '../utils/listening';
+import Wrapped from '../components/Wrapped';
 import './Pages.css';
 import './Stats.css';
 
@@ -28,14 +30,22 @@ export default function Stats() {
   const [songs, setSongs] = useState([]);
   const { playSong } = usePlayer();
   const canvasRef = useRef(null);
+  const [wrapped, setWrapped] = useState(null); // { stats, year, month } or null
 
   useEffect(() => {
-    getAllSongs().then(setSongs);
+    getAllSongs().then(list => {
+      setSongs(list);
+      // One-time migration: seed legacy listening from old playCount × duration
+      migrateLegacyListening(list);
+    });
   }, []);
 
   const totalPlays = songs.reduce((sum, s) => sum + (s.playCount || 0), 0);
   const safeDur = (d) => (d && isFinite(d) && d > 0) ? d : 0;
-  const totalMinutes = Math.round(songs.reduce((sum, s) => sum + (s.playCount || 0) * safeDur(s.duration), 0) / 60);
+  // Real listen time (only counted while playing) — lifetime across all months
+  const lifetimeSec = getLifetimeSec();
+  const totalMinutes = Math.round(lifetimeSec / 60);
+  const wrappedWindow = getWrappedWindowStatus();
   const topSongs = [...songs].filter(s => s.playCount > 0).sort((a, b) => (b.playCount || 0) - (a.playCount || 0)).slice(0, 15);
   const topArtists = {};
   songs.forEach(s => {
@@ -190,6 +200,30 @@ export default function Stats() {
         <p className="subtitle">Your listening stats</p>
       </div>
 
+      {/* Monthly Wrapped — only viewable within 3 days before/after month-end */}
+      {wrappedWindow.open && (
+        <section className="stats-section wrapped-launcher-sec">
+          <h2><IoSparkles style={{ color: '#fbbf24' }} /> Monthly Wrapped</h2>
+          <p className="stats-section-desc">
+            {wrappedWindow.kind === 'preview'
+              ? 'Your month is wrapping up — here\'s an early look at your Wrapped.'
+              : 'Your Wrapped for last month is ready! Available for a few days only.'}
+          </p>
+          <div className="wrapped-launchers">
+            <button
+              className="wrapped-launch-btn primary"
+              onClick={() => setWrapped({ stats: wrappedWindow.stats, year: wrappedWindow.year, month: wrappedWindow.month })}
+              disabled={!wrappedWindow.stats?.totalSec}
+            >
+              <IoSparkles /> Open {wrappedWindow.kind === 'preview' ? 'this' : 'last'} month's Wrapped
+            </button>
+          </div>
+          <p className="wrapped-window-hint">
+            <IoCalendar /> Viewable only from the last 3 days of a month through the first 3 days of the next.
+          </p>
+        </section>
+      )}
+
       <div className="stats-cards">
         <div className="stats-card">
           <IoPlay className="stats-card-icon" />
@@ -334,6 +368,15 @@ export default function Stats() {
           <IoPlay className="empty-icon" />
           <p>No play data yet. Start listening to see your stats!</p>
         </div>
+      )}
+
+      {wrapped && (
+        <Wrapped
+          stats={wrapped.stats}
+          year={wrapped.year}
+          month={wrapped.month}
+          onClose={() => setWrapped(null)}
+        />
       )}
     </div>
   );

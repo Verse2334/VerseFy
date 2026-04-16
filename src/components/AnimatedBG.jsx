@@ -44,31 +44,59 @@ export default function AnimatedBG() {
       });
     }
 
+    // Pre-bake each orb gradient once to an offscreen canvas — createRadialGradient
+    // is expensive and we were rebuilding it 3× per frame for no reason.
+    function bakeOrb(c) {
+      const size = 600;
+      const off = document.createElement('canvas');
+      off.width = size; off.height = size;
+      const octx = off.getContext('2d');
+      const g = octx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+      g.addColorStop(0, `rgba(${c.r}, ${c.g}, ${c.b}, 0.04)`);
+      g.addColorStop(1, 'transparent');
+      octx.fillStyle = g;
+      octx.fillRect(0, 0, size, size);
+      return off;
+    }
+    const orbA = bakeOrb(c1);
+    const orbB = bakeOrb(c2);
+
     let time = 0;
-    function draw() {
-      time += 0.005;
+    let lastFrame = 0;
+    const TARGET_MS = 1000 / 30; // 30fps is plenty for a background
+
+    function draw(now) {
+      // Skip when the window is hidden/minimized — huge CPU+GPU win
+      if (document.hidden) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      // Frame-rate throttle
+      if (now - lastFrame < TARGET_MS) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
+      const dt = Math.min(50, now - lastFrame || 16);
+      lastFrame = now;
+      time += dt * 0.00015;
+
       const W = canvas.width;
       const H = canvas.height;
-
       ctx.clearRect(0, 0, W, H);
 
-      // Slow-moving orbs
+      // Orbs — stamp pre-baked gradients instead of rebuilding them per frame
       for (let i = 0; i < 3; i++) {
         const a = time * 0.15 + i * 2.1;
         const ox = W * 0.5 + Math.cos(a) * W * 0.25;
         const oy = H * 0.3 + Math.sin(a * 0.7) * H * 0.2;
-        const c = i % 2 === 0 ? c1 : c2;
-        const grad = ctx.createRadialGradient(ox, oy, 0, ox, oy, 300);
-        grad.addColorStop(0, `rgba(${c.r}, ${c.g}, ${c.b}, 0.04)`);
-        grad.addColorStop(1, 'transparent');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
+        const img = i % 2 === 0 ? orbA : orbB;
+        ctx.drawImage(img, ox - 300, oy - 300);
       }
 
       // Particles
       for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
+        p.x += p.vx * (dt / 16);
+        p.y += p.vy * (dt / 16);
         if (p.x < -10) p.x = W + 10;
         if (p.x > W + 10) p.x = -10;
         if (p.y < -10) p.y = H + 10;

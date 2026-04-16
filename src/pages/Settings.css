@@ -448,3 +448,307 @@
     order: 3;
   }
 }
+
+/* ===== Video Background settings ===== */
+.videobg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.videobg-enable {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.videobg-enable input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.videobg-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.videobg-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.videobg-tab:hover {
+  color: #fff;
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.videobg-tab.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(236, 72, 153, 0.15));
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.videobg-content {
+  margin-bottom: 12px;
+}
+
+.videobg-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.videobg-input:focus {
+  border-color: var(--accent);
+}
+
+.videobg-err { margin-top: 6px; font-size: 11px; color: #f87171; }
+.videobg-ok { margin-top: 6px; font-size: 11px; color: #4ade80; }
+
+.videobg-file-input { display: none; }
+
+.videobg-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.videobg-upload:hover {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+.videobg-file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.videobg-clear {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #f87171;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.videobg-clear:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.videobg-opacity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.videobg-opacity label { min-width: 100px; }
+.videobg-opacity input[type="range"] { flex: 1; accent-color: var(--accent); }
+.videobg-opacity span { min-width: 40px; text-align: right; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* ===== Video Background — library UI ===== */
+.videobg-yt-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.videobg-yt-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.videobg-yt-input-wrap .videobg-input {
+  background: transparent;
+  border: none;
+  padding: 10px 0;
+}
+
+.videobg-download-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #ef4444, #ec4899);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.videobg-download-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.35);
+}
+
+.videobg-download-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.videobg-progress {
+  padding: 8px 12px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+
+.videobg-upload-row {
+  margin-bottom: 14px;
+}
+
+.videobg-library {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.videobg-library-label {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.videobg-library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.videobg-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.videobg-card:hover {
+  background: rgba(139, 92, 246, 0.1);
+  transform: translateY(-1px);
+}
+
+.videobg-card.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(236, 72, 153, 0.15));
+  border-color: var(--accent);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.25);
+}
+
+.videobg-card-icon {
+  font-size: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: 8px;
+}
+
+.videobg-card.active .videobg-card-icon {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.videobg-card-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.videobg-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.videobg-card-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.videobg-card-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.videobg-card-delete:hover {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}

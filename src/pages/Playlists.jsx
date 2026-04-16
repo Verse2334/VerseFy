@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { getAllPlaylists, createPlaylist, deletePlaylist, updatePlaylist, getPlaylist, getAllSongs } from '../utils/db';
 import SongList from '../components/SongList';
-import { IoAdd, IoTrash, IoPencil, IoChevronBack, IoMusicalNotes, IoClose, IoCheckmarkCircle, IoImage } from 'react-icons/io5';
+import { IoAdd, IoTrash, IoPencil, IoChevronBack, IoMusicalNotes, IoClose, IoCheckmarkCircle, IoImage, IoShareSocial } from 'react-icons/io5';
 import { v4 as uuidv4 } from 'uuid';
 import './Pages.css';
 
@@ -170,6 +170,64 @@ export default function Playlists() {
     }
   }
 
+  function exportPlaylistImage() {
+    if (!selected || playlistSongs.length === 0) return;
+    const W = 500, H = 320 + Math.min(playlistSongs.length, 8) * 24;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const c = canvas.getContext('2d');
+
+    // Background
+    const bg = c.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#0f0520');
+    bg.addColorStop(0.5, '#150a2e');
+    bg.addColorStop(1, '#0a0515');
+    c.fillStyle = bg; c.fillRect(0, 0, W, H);
+
+    // Border
+    c.strokeStyle = 'rgba(139, 92, 246, 0.3)'; c.lineWidth = 2;
+    c.roundRect(4, 4, W - 8, H - 8, 16); c.stroke();
+
+    // Playlist name
+    c.fillStyle = '#fff'; c.font = 'bold 26px Inter, sans-serif';
+    c.fillText(selected.name, 24, 42);
+
+    // Song count
+    c.fillStyle = '#888'; c.font = '13px Inter, sans-serif';
+    c.fillText(`${playlistSongs.length} songs`, 24, 64);
+
+    // Divider
+    c.fillStyle = 'rgba(139, 92, 246, 0.2)';
+    c.fillRect(24, 78, W - 48, 1);
+
+    // Songs list
+    const maxSongs = Math.min(playlistSongs.length, 8);
+    playlistSongs.slice(0, maxSongs).forEach((s, i) => {
+      const y = 100 + i * 24;
+      c.fillStyle = 'rgba(139, 92, 246, 0.5)'; c.font = 'bold 12px Inter, sans-serif';
+      c.fillText(`${i + 1}.`, 24, y);
+      c.fillStyle = '#ddd'; c.font = '13px Inter, sans-serif';
+      c.fillText(s.title.slice(0, 40), 46, y);
+      c.fillStyle = '#666'; c.font = '11px Inter, sans-serif';
+      c.textAlign = 'right';
+      c.fillText(s.artist || 'Unknown', W - 24, y);
+      c.textAlign = 'left';
+    });
+    if (playlistSongs.length > 8) {
+      c.fillStyle = '#555'; c.font = '12px Inter, sans-serif';
+      c.fillText(`+ ${playlistSongs.length - 8} more songs`, 24, 100 + maxSongs * 24 + 10);
+    }
+
+    // Watermark
+    c.fillStyle = 'rgba(139, 92, 246, 0.3)'; c.font = '10px Inter, sans-serif';
+    c.textAlign = 'right'; c.fillText('versefy', W - 16, H - 12); c.textAlign = 'left';
+
+    const link = document.createElement('a');
+    link.download = `${selected.name}-playlist.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+
   function renderPlaylistArt(pl, large = false) {
     const grad = pl.gradient || PRESET_GRADIENTS[0];
     const sizeClass = large ? 'playlist-card-art large' : 'playlist-card-art';
@@ -258,6 +316,9 @@ export default function Playlists() {
         <div className="playlist-actions-bar">
           <button className="btn btn-primary" onClick={() => setShowAddSongs(!showAddSongs)}>
             {showAddSongs ? <><IoClose /> Done</> : <><IoAdd /> Add Songs</>}
+          </button>
+          <button className="btn" onClick={exportPlaylistImage}>
+            <IoShareSocial /> Share as Image
           </button>
         </div>
 

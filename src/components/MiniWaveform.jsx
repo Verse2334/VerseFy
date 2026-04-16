@@ -20,6 +20,8 @@ export default function MiniWaveform({ width = 120, height = 32 }) {
     function draw(now) {
       animRef.current = requestAnimationFrame(draw);
 
+      // Pause entirely when window hidden
+      if (document.hidden) return;
       // Throttle to ~24fps
       if (now - lastDraw < 42) return;
       lastDraw = now;

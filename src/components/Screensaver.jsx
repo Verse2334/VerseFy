@@ -56,8 +56,13 @@ export default function Screensaver() {
     const ctx = canvas.getContext('2d');
 
     function resize() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      const MAX = 1920;
+      const w = window.innerWidth, h = window.innerHeight;
+      const scale = Math.min(1, MAX / Math.max(w, h));
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
     }
     resize();
     window.addEventListener('resize', resize);
@@ -66,6 +71,7 @@ export default function Screensaver() {
 
     function draw() {
       animRef.current = requestAnimationFrame(draw);
+      if (document.hidden) return; // skip when window hidden/minimized
       const W = canvas.width, H = canvas.height;
       const analyser = analyserRef.current;
 

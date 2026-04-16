@@ -1,0 +1,75 @@
+.tamper-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  animation: tamperIn 0.4s ease;
+}
+
+@keyframes tamperIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tamper-card {
+  max-width: 520px;
+  padding: 36px 32px;
+  background: linear-gradient(180deg, #170808 0%, #0a0505 100%);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(248, 113, 113, 0.25);
+  text-align: center;
+  color: #fff;
+}
+
+.tamper-icon {
+  font-size: 52px;
+  color: #f87171;
+  text-shadow: 0 0 24px rgba(248, 113, 113, 0.8);
+  margin-bottom: 12px;
+}
+
+.tamper-card h1 {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 14px;
+  color: #fca5a5;
+  letter-spacing: -0.5px;
+}
+
+.tamper-card p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0 0 12px;
+}
+
+.tamper-sig {
+  padding: 12px 16px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 10px;
+  margin: 18px 0 14px !important;
+  color: #c4b5fd !important;
+  font-size: 13px !important;
+}
+
+.tamper-sig strong {
+  color: #fff;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+}
+
+.tamper-small {
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  margin-top: 6px;
+}

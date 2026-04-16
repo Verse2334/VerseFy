@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useRef, useEffect, useCallback } from 'react';
-import { addToRecentlyPlayed, incrementPlayCount, getAllSongs as dbGetAllSongs } from '../utils/db';
+import { addToRecentlyPlayed, incrementPlayCount, getAllSongs as dbGetAllSongs, getSong as dbGetSong } from '../utils/db';
+import { addListeningSecond, markSessionStart } from '../utils/listening';
 
 const PlayerContext = createContext();
 
@@ -27,6 +28,7 @@ const initialState = {
   showQueue: false,
   showEQ: false,
   bassBoost: false,
+  bassBoostAmount: 15, // dB (1-24), only takes effect when bassBoost is true
   pitchShift: 0, // semitones (-12 to 12)
   normalization: false,
   sleepTimer: 0, // minutes remaining, 0 = off
@@ -37,6 +39,10 @@ const initialState = {
   monoMode: false,
   eightDAudio: false,
   karaoke: false,
+  spatialEnabled: false,
+  spatialX: 0, // -1 left .. 1 right
+  spatialY: 0, // -1 close .. 1 far
+  vibeMorph: 50, // 0 = chill, 50 = neutral, 100 = hype
 };
 
 function reducer(state, action) {
@@ -80,6 +86,8 @@ function reducer(state, action) {
       return { ...state, showEQ: !state.showEQ };
     case 'SET_BASS_BOOST':
       return { ...state, bassBoost: action.payload };
+    case 'SET_BASS_BOOST_AMOUNT':
+      return { ...state, bassBoostAmount: action.payload };
     case 'SET_PITCH_SHIFT':
       return { ...state, pitchShift: action.payload };
     case 'SET_NORMALIZATION':
@@ -100,6 +108,10 @@ function reducer(state, action) {
       return { ...state, eightDAudio: action.payload };
     case 'SET_KARAOKE':
       return { ...state, karaoke: action.payload };
+    case 'SET_SPATIAL':
+      return { ...state, ...action.payload };
+    case 'SET_VIBE_MORPH':
+      return { ...state, vibeMorph: action.payload };
     default:
       return state;
   }
@@ -154,8 +166,10 @@ export function PlayerProvider({ children }) {
   const bassBoostFilterRef = useRef(null);
   const compressorRef = useRef(null);
   const sleepTimerRef = useRef(null);
-  const pannerRef = useRef(null); // for 8D audio
+  const pannerRef = useRef(null); // for 8D audio & spatial
   const eightDIntervalRef = useRef(null);
+  const spatialFilterRef = useRef(null); // lowpass for depth
+  const spatialGainRef = useRef(null); // distance attenuation
   // Keep a ref to latest state so audio callbacks never see stale values
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -221,7 +235,19 @@ export function PlayerProvider({ children }) {
     panner.pan.value = 0;
     pannerRef.current = panner;
 
-    // Chain: source -> analyser -> EQ -> bassBoost -> gain -> panner -> dry -> destination
+    // Spatial "depth" filter (lowpass) — muffles audio when source feels far away
+    const spatialFilter = ctx.createBiquadFilter();
+    spatialFilter.type = 'lowpass';
+    spatialFilter.frequency.value = 22000; // transparent by default
+    spatialFilter.Q.value = 0.7;
+    spatialFilterRef.current = spatialFilter;
+
+    // Spatial distance gain
+    const spatialGain = ctx.createGain();
+    spatialGain.gain.value = 1;
+    spatialGainRef.current = spatialGain;
+
+    // Chain: source -> analyser -> EQ -> bassBoost -> gain -> panner -> spatialFilter -> spatialGain -> dry -> destination
     //                                                       -> reverb -> reverbGain -> destination
     source.connect(analyser);
     let lastNode = analyser;
@@ -232,7 +258,9 @@ export function PlayerProvider({ children }) {
     lastNode.connect(bassBoost);
     bassBoost.connect(gain);
     gain.connect(panner);
-    panner.connect(dryGain);
+    panner.connect(spatialFilter);
+    spatialFilter.connect(spatialGain);
+    spatialGain.connect(dryGain);
     dryGain.connect(ctx.destination);
     gain.connect(reverb);
     reverb.connect(reverbGain);
@@ -340,7 +368,9 @@ export function PlayerProvider({ children }) {
     }
 
     // Re-apply Web Audio node states
-    if (bassBoostFilterRef.current) bassBoostFilterRef.current.gain.value = s.bassBoost ? 15 : 0;
+    if (bassBoostFilterRef.current) {
+      bassBoostFilterRef.current.gain.value = s.bassBoost ? (s.bassBoostAmount ?? 15) : 0;
+    }
     // Normalization: connect/disconnect compressor
     if (gainRef.current && compressorRef.current && dryGainRef.current) {
       try {
@@ -361,18 +391,33 @@ export function PlayerProvider({ children }) {
   }
 
   // Helper: load a song into the audio element and play when ready
+  const pendingLoadRef = useRef(null); // { onCanPlay, fallbackTimer, genId }
+  const loadGenRef = useRef(0);
   const loadAndPlay = useCallback((song, fadeIn = false, targetVol = null) => {
     const audio = audioRef.current;
     const vol = targetVol ?? audio.volume;
+
+    // Cancel any previous pending load (prevents stale listeners + stuck skip)
+    if (pendingLoadRef.current) {
+      audio.removeEventListener('canplay', pendingLoadRef.current.onCanPlay);
+      if (pendingLoadRef.current.fallbackTimer) clearTimeout(pendingLoadRef.current.fallbackTimer);
+      pendingLoadRef.current = null;
+    }
+
+    const genId = ++loadGenRef.current;
 
     audio.pause();
     audio.src = song.audioUrl;
 
     if (fadeIn) audio.volume = 0;
 
-    // Wait for audio to be ready, THEN re-apply settings and play
-    const onCanPlay = () => {
-      audio.removeEventListener('canplay', onCanPlay);
+    const startPlayback = () => {
+      if (loadGenRef.current !== genId) return; // a newer load superseded this one
+      if (pendingLoadRef.current) {
+        audio.removeEventListener('canplay', pendingLoadRef.current.onCanPlay);
+        if (pendingLoadRef.current.fallbackTimer) clearTimeout(pendingLoadRef.current.fallbackTimer);
+        pendingLoadRef.current = null;
+      }
 
       // Re-apply AFTER load — audio.load() resets playbackRate to 1.0
       reapplyAudioSettings();
@@ -393,8 +438,19 @@ export function PlayerProvider({ children }) {
         }, 50);
       }
     };
+
+    const onCanPlay = () => startPlayback();
+    // Safety net: if canplay never fires (bad file / already buffered), force-start after 1.5s
+    const fallbackTimer = setTimeout(() => {
+      if (loadGenRef.current === genId) startPlayback();
+    }, 1500);
+
+    pendingLoadRef.current = { onCanPlay, fallbackTimer, genId };
     audio.addEventListener('canplay', onCanPlay);
     audio.load();
+
+    // If the audio was already ready before we even registered (cached blob), kick off now
+    if (audio.readyState >= 3) startPlayback();
   }, []); // no deps needed — reads from refs
 
   // Play a transition sound effect
@@ -448,9 +504,20 @@ export function PlayerProvider({ children }) {
   }, []);
 
   // Transition to a new song with optional crossfade + transition effects
-  const transitionToSong = useCallback((song) => {
+  // Lists fetched via getAllSongs strip audioUrl to save RAM — fetch it here on demand.
+  const transitionToSong = useCallback(async (song) => {
     ensureAudioGraph();
     if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
+
+    // Hydrate audioUrl on demand (only the currently-playing song needs the blob in memory)
+    let playable = song;
+    if (!song.audioUrl) {
+      try {
+        const full = await dbGetSong(song.id);
+        if (!full?.audioUrl) return;
+        playable = full;
+      } catch { return; }
+    }
 
     const s = stateRef.current;
     const cfDur = s.crossfadeDuration;
@@ -472,16 +539,16 @@ export function PlayerProvider({ children }) {
           audio.volume = Math.max(0, audio.volume - step);
         } else {
           clearInterval(fadeOut);
-          loadAndPlay(song, true, oldVol);
+          loadAndPlay(playable, true, oldVol);
         }
       }, 50);
     } else {
-      loadAndPlay(song);
+      loadAndPlay(playable);
     }
 
     dispatch({ type: 'SET_PLAYING', payload: true });
-    addToRecentlyPlayed(song.id).catch(() => {});
-    incrementPlayCount(song.id).catch(() => {});
+    addToRecentlyPlayed(playable.id).catch(() => {});
+    incrementPlayCount(playable.id).catch(() => {});
   }, [ensureAudioGraph, loadAndPlay, playTransitionSfx]);
 
   const playSong = useCallback((songs, index) => {
@@ -573,7 +640,16 @@ export function PlayerProvider({ children }) {
     const newVal = !stateRef.current.bassBoost;
     dispatch({ type: 'SET_BASS_BOOST', payload: newVal });
     if (bassBoostFilterRef.current) {
-      bassBoostFilterRef.current.gain.value = newVal ? 15 : 0;
+      bassBoostFilterRef.current.gain.value = newVal ? (stateRef.current.bassBoostAmount ?? 15) : 0;
+    }
+  }, []);
+
+  // Bass boost intensity (only audible while bass boost is ON)
+  const setBassBoostAmount = useCallback((amount) => {
+    const v = Math.max(0, Math.min(24, amount));
+    dispatch({ type: 'SET_BASS_BOOST_AMOUNT', payload: v });
+    if (bassBoostFilterRef.current && stateRef.current.bassBoost) {
+      bassBoostFilterRef.current.gain.value = v;
     }
   }, []);
 
@@ -685,6 +761,80 @@ export function PlayerProvider({ children }) {
     }
   }, []);
 
+  // Spatial audio pad — X = pan (-1..1), Y = depth (-1 close .. 1 far)
+  const applySpatial = useCallback((enabled, x, y) => {
+    if (!pannerRef.current || !spatialFilterRef.current || !spatialGainRef.current) return;
+    if (!enabled) {
+      // Reset nodes to transparent (unless 8D is running, which manages panner itself)
+      if (!stateRef.current.eightDAudio) pannerRef.current.pan.value = 0;
+      spatialFilterRef.current.frequency.value = 22000;
+      spatialGainRef.current.gain.value = 1;
+      return;
+    }
+    // X → pan (only if 8D isn't auto-panning)
+    if (!stateRef.current.eightDAudio) {
+      pannerRef.current.pan.value = Math.max(-1, Math.min(1, x));
+    }
+    // Y → depth: close (-1) = bright & loud, far (+1) = muffled & quieter
+    // Map y from -1..1 → freq from 22000..600 Hz (log-ish)
+    const t = (y + 1) / 2; // 0..1 (0=close, 1=far)
+    const freq = 22000 * Math.pow(600 / 22000, t);
+    spatialFilterRef.current.frequency.value = freq;
+    spatialGainRef.current.gain.value = 1 - t * 0.45; // up to -4.8dB at max distance
+  }, []);
+
+  const setSpatialPad = useCallback((partial) => {
+    const s = stateRef.current;
+    const enabled = partial.enabled !== undefined ? partial.enabled : s.spatialEnabled;
+    const x = partial.x !== undefined ? partial.x : s.spatialX;
+    const y = partial.y !== undefined ? partial.y : s.spatialY;
+    dispatch({ type: 'SET_SPATIAL', payload: { spatialEnabled: enabled, spatialX: x, spatialY: y } });
+    applySpatial(enabled, x, y);
+  }, [applySpatial]);
+
+  // Vibe morph — single slider that blends multiple audio effects
+  // 0 = chill (slow, heavy reverb, smooth lows), 50 = neutral, 100 = hype (fast, bright, bass boost)
+  const setVibeMorph = useCallback((val) => {
+    const v = Math.max(0, Math.min(100, val));
+    dispatch({ type: 'SET_VIBE_MORPH', payload: v });
+    const audio = audioRef.current;
+
+    // Normalize: -1 chill .. 0 neutral .. +1 hype
+    const t = (v - 50) / 50;
+
+    // Speed: 0.82x at chill → 1.0 neutral → 1.18x hype
+    const speed = 1 + t * 0.18;
+    audio.playbackRate = speed;
+    audio.preservesPitch = Math.abs(t) < 0.02;
+    dispatch({ type: 'SET_SPEED', payload: speed });
+
+    // Reverb: wet at chill → dry at hype
+    const reverb = t < 0 ? Math.round(-t * 50) : 0;
+    if (reverbGainRef.current && dryGainRef.current) {
+      const wet = reverb / 100;
+      reverbGainRef.current.gain.value = wet * 0.8;
+      dryGainRef.current.gain.value = 1 - wet * 0.3;
+    }
+    dispatch({ type: 'SET_REVERB_AMOUNT', payload: reverb });
+
+    // EQ curve: chill = warm lows, cut highs; hype = boost bass + highs, scoop mids
+    let eq;
+    if (t <= 0) {
+      // Chill curve
+      eq = [4 * -t, 2 * -t, 1, -1 * -t, -2 * -t, -3 * -t];
+    } else {
+      // Hype curve
+      eq = [6 * t, 3 * t, -1 * t, 1 * t, 4 * t, 6 * t];
+    }
+    eqFiltersRef.current.forEach((f, i) => { if (eq[i] !== undefined) f.gain.value = eq[i]; });
+    dispatch({ type: 'SET_EQ', payload: eq });
+
+    // Bass boost filter for extra hype push
+    if (bassBoostFilterRef.current) {
+      bassBoostFilterRef.current.gain.value = t > 0.4 ? 8 * t : 0;
+    }
+  }, []);
+
   // Wallpaper visualizer
   const toggleWallpaperViz = useCallback(() => dispatch({ type: 'TOGGLE_WALLPAPER_VIZ' }), []);
 
@@ -712,6 +862,23 @@ export function PlayerProvider({ children }) {
     audioRef.current.volume = state.isMuted ? 0 : state.volume;
   }, [state.volume, state.isMuted]);
 
+  // ===== Listening-time tracker — increments 1s only while actually playing =====
+  useEffect(() => {
+    if (!state.isPlaying || !state.currentSong) return;
+    markSessionStart();
+    const audio = audioRef.current;
+    let lastT = audio.currentTime;
+    const interval = setInterval(() => {
+      // Only count if the audio element is actually advancing (not buffering/stalled)
+      const t = audio.currentTime;
+      if (!audio.paused && t !== lastT) {
+        addListeningSecond(stateRef.current.currentSong);
+      }
+      lastT = t;
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [state.isPlaying, state.currentSong]);
+
   // ===== Save session to localStorage every 3 seconds =====
   useEffect(() => {
     const interval = setInterval(() => {
@@ -730,6 +897,7 @@ export function PlayerProvider({ children }) {
           effectMode: s.effectMode,
           playbackSpeed: s.playbackSpeed,
           bassBoost: s.bassBoost,
+          bassBoostAmount: s.bassBoostAmount,
           pitchShift: s.pitchShift,
           normalization: s.normalization,
           eqValues: s.eqValues,
@@ -785,15 +953,19 @@ export function PlayerProvider({ children }) {
         dispatch({ type: 'SET_EFFECT_MODE', payload: session.effectMode || 'normal' });
         dispatch({ type: 'SET_SPEED', payload: session.playbackSpeed || 1.0 });
         if (session.bassBoost) dispatch({ type: 'SET_BASS_BOOST', payload: true });
+        if (session.bassBoostAmount !== undefined) dispatch({ type: 'SET_BASS_BOOST_AMOUNT', payload: session.bassBoostAmount });
         dispatch({ type: 'SET_PITCH_SHIFT', payload: session.pitchShift || 0 });
         if (session.normalization) dispatch({ type: 'SET_NORMALIZATION', payload: true });
         if (session.eqValues) dispatch({ type: 'SET_EQ', payload: session.eqValues });
         dispatch({ type: 'SET_CROSSFADE', payload: session.crossfadeDuration || 0 });
         dispatch({ type: 'SET_TRANSITION_EFFECT', payload: session.transitionEffect || 'none' });
 
-        // Load the song into audio element but DON'T play — paused at last position
+        // Load the song into audio element but DON'T play — paused at last position.
+        // Fetch the full record (getAllSongs now strips audioUrl to save RAM).
         const audio = audioRef.current;
-        audio.src = currentSong.audioUrl;
+        const fullCurrent = currentSong.audioUrl ? currentSong : await dbGetSong(currentSong.id);
+        if (!fullCurrent?.audioUrl) return;
+        audio.src = fullCurrent.audioUrl;
         audio.volume = session.isMuted ? 0 : (session.volume ?? 0.8);
 
         const onReady = () => {
@@ -822,9 +994,10 @@ export function PlayerProvider({ children }) {
     setEffectMode, ensureAudioGraph,
     setEQ, resetEQ, setCrossfade, setSpeed,
     toggleQueue, toggleEQ,
-    toggleBassBoost, setPitchShift, toggleNormalization,
+    toggleBassBoost, setBassBoostAmount, setPitchShift, toggleNormalization,
     setSleepTimer, setTransitionEffect, toggleWallpaperViz,
     setReverbAmount, toggleMono, toggle8DAudio, toggleKaraoke, setStereoWidth,
+    setSpatialPad, setVibeMorph,
     EQ_BANDS, TRANSITION_EFFECTS,
   };
 

@@ -1,6 +1,6 @@
 .player {
   height: 84px;
-  background: linear-gradient(180deg, rgba(14, 14, 22, 0.95) 0%, rgba(6, 6, 9, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(14, 14, 22, 0.97) 0%, rgba(6, 6, 9, 0.99) 100%);
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -9,7 +9,6 @@
   gap: 16px;
   z-index: 100;
   position: relative;
-  backdrop-filter: blur(20px);
 }
 
 .player.has-song::before {
@@ -386,6 +385,60 @@
   position: relative;
 }
 
+.player-volume {
+  position: relative;
+}
+
+.vol-input-popup {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(14, 14, 22, 0.95);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  z-index: 500;
+  animation: volPopIn 0.15s ease;
+}
+
+@keyframes volPopIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vol-input-popup input {
+  width: 50px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 6px;
+  outline: none;
+  font-family: inherit;
+  -moz-appearance: textfield;
+}
+
+.vol-input-popup input::-webkit-outer-spin-button,
+.vol-input-popup input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.vol-input-popup input:focus {
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.vol-input-popup span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .volume-thumb {
   position: absolute;
   right: -4px;
@@ -399,12 +452,53 @@
   transition: opacity 0.15s;
 }
 
-/* ========== Mobile ========== */
-@media (max-width: 768px) {
-  .player { padding: 0 10px; gap: 10px; }
+/* ========== Responsive player ========== */
+
+/* Wide but not huge — tighten right-side gaps so they don't bleed into the progress bar */
+@media (max-width: 1200px) {
+  .player-right { gap: 6px; max-width: 240px; }
+  .player-waveform { display: none; }
+  .player-volume .volume-bar { width: 90px; }
+}
+
+/* Medium — hide the S+R effect label to recover horizontal room */
+@media (max-width: 1050px) {
+  .player-right { gap: 4px; max-width: 220px; }
+  .player-song-info { min-width: 140px; max-width: 200px; }
+  .effect-btn { display: none; }
+  .player-volume .volume-bar { width: 70px; }
+  .player-center { max-width: 540px; }
+}
+
+/* Smaller — drop visualizer shortcut & shrink volume further */
+@media (max-width: 900px) {
+  .player { padding: 0 12px; gap: 8px; }
+  .player-song-info { min-width: 120px; max-width: 170px; }
+  .visualizer-btn { display: none; }
+  .player-volume .volume-bar { width: 55px; }
+  .player-right { max-width: 200px; }
+}
+
+/* Small — drop volume slider entirely (mute button still works), tighten center */
+@media (max-width: 740px) {
+  .player { padding: 0 10px; gap: 6px; }
+  .player-song-info { min-width: 80px; max-width: 130px; }
+  .player-volume .volume-bar { display: none; }
+  .player-center { flex: 3; max-width: none; }
+  .player-right { gap: 2px; max-width: 160px; }
+  .control-btn.small { width: 28px; height: 28px; font-size: 14px; }
+}
+
+/* Very small — drop most of the right cluster */
+@media (max-width: 580px) {
   .player-song-info { min-width: 0; max-width: 100px; }
-  .player-volume, .player-waveform, .effect-btn, .visualizer-btn { display: none; }
-  .player-center { flex: 3; }
-  .player-right { max-width: 60px; gap: 4px; }
-  .control-btn.small { display: none; }
+  .player-right { max-width: 90px; }
+  .player-actions-mini { display: none; }
+}
+
+/* Tiny — only leave core transport controls */
+@media (max-width: 460px) {
+  .player-right .control-btn.small:not(:last-child) { display: none; }
+  .player-volume .control-btn.small { display: flex; }
+  .player-right { max-width: 50px; }
 }

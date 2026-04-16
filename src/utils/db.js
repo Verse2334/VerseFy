@@ -112,7 +112,21 @@ export async function addSong(song) {
   await db.put('songs', { tags: [], category: '', type: 'music', folderId: null, favorite: false, ...song });
 }
 
+// Returns song METADATA only — drops audioUrl blobs so the UI list
+// doesn't hold every song's full audio payload in React state.
+// The player fetches the real audioUrl on demand via getSong(id).
 export async function getAllSongs() {
+  const db = await getDB();
+  const songs = await db.getAll('songs');
+  return songs.map(normalizeSong).map(s => {
+    const { audioUrl, ...rest } = s;
+    return { ...rest, _hasAudio: !!audioUrl };
+  }).sort((a, b) => b.addedAt - a.addedAt);
+}
+
+// Heavy variant — returns everything including audioUrl. Use when you
+// actually need to play/export a song.
+export async function getAllSongsFull() {
   const db = await getDB();
   const songs = await db.getAll('songs');
   return songs.map(normalizeSong).sort((a, b) => b.addedAt - a.addedAt);
