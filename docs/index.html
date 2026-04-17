@@ -262,13 +262,14 @@
     padding: 40px 0;
   }
 
-  /* Animated waveform — sits at the bottom of the hero as a subtle accent, not over the buttons */
+  /* Animated waveform — sits at the bottom of the hero as a subtle accent, not over the buttons.
+     Escapes the 1200px container so it spans the full viewport edge-to-edge. */
   .hero-wave {
     position: absolute;
     bottom: -40px;
-    left: 0;
-    right: 0;
-    width: 100%;
+    left: 50%;
+    width: 100vw;
+    margin-left: -50vw;
     height: 220px;
     z-index: 0;
     opacity: 0.35;
