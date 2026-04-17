@@ -79,6 +79,36 @@
       radial-gradient(ellipse at center, transparent 0%, rgba(5, 5, 16, 0.4) 70%, rgba(5, 5, 16, 0.85) 100%);
   }
 
+  /* ============ HOME VIDEO BACKGROUND ============ */
+  /* Hidden by default — only shows on the Home tab. Sits above the canvas
+     but below the mesh so the purple/pink wash still tints the vibe. */
+  #home-video {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: -4;          /* behind everything */
+    opacity: 0;           /* fade in via body.on-home */
+    transition: opacity 0.7s ease;
+    pointer-events: none;
+  }
+  #home-video-dim {
+    position: fixed;
+    inset: 0;
+    z-index: -3;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.7s ease;
+    background:
+      linear-gradient(180deg, rgba(5, 5, 16, 0.4) 0%, rgba(5, 5, 16, 0.7) 100%);
+  }
+  body.on-home #home-video { opacity: 0.6; }
+  body.on-home #home-video-dim { opacity: 1; }
+  /* When the video is active, tone down the mesh so they don't fight for
+     attention. The mesh stays subtle but the video is the main show. */
+  body.on-home #bg-mesh { opacity: 0.35; }
+
   /* ============ NAV (TABS) ============ */
   nav.top {
     position: fixed;
@@ -1029,6 +1059,14 @@
 <div id="bg-mesh"></div>
 <div id="bg-vignette"></div>
 
+<!-- Home-only video background. Drop your file at docs/videos/home-bg.mp4
+     (optional webm fallback for smaller file). It stays hidden on other tabs. -->
+<video id="home-video" autoplay muted loop playsinline preload="auto" poster="">
+  <source src="videos/home-bg.webm" type="video/webm">
+  <source src="videos/home-bg.mp4" type="video/mp4">
+</video>
+<div id="home-video-dim"></div>
+
 <!-- Tab nav -->
 <nav class="top">
   <div class="brand" data-tab="home">
@@ -1507,6 +1545,14 @@
     document.querySelectorAll('.tab').forEach(t => {
       t.classList.toggle('active', t.dataset.tab === name);
     });
+
+    // Show home video only on the home tab, pause it elsewhere to save CPU/GPU
+    document.body.classList.toggle('on-home', name === 'home');
+    const vid = document.getElementById('home-video');
+    if (vid) {
+      if (name === 'home') vid.play().catch(() => {});
+      else vid.pause();
+    }
 
     // Reset scroll in the activated page
     const active = document.querySelector(`.page[data-page="${name}"]`);
