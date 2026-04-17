@@ -1,0 +1,1687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Versefy — Free desktop music player</title>
+<meta name="description" content="Versefy is a free, non-commercial, 100% offline music & SFX desktop player for Windows. DJ mode, visualizers, YouTube import, Discord RPC." />
+<meta property="og:title" content="Versefy — Free desktop music player" />
+<meta property="og:description" content="Free, offline, no tracking. Built by Verse." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --accent: #8b5cf6;
+    --accent-hover: #a78bfa;
+    --secondary: #ec4899;
+    --warm: #f59e0b;
+    --cool: #06b6d4;
+    --bg: #050510;
+    --panel: rgba(18, 18, 32, 0.55);
+    --border: rgba(255, 255, 255, 0.08);
+    --text: #f5f5fa;
+    --text-muted: rgba(255, 255, 255, 0.6);
+    --text-dim: rgba(255, 255, 255, 0.38);
+    --glow: rgba(139, 92, 246, 0.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;      /* we scroll per page instead */
+    line-height: 1.5;
+  }
+  a { color: inherit; text-decoration: none; }
+  img { display: block; max-width: 100%; }
+  code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 0.9em; }
+
+  /* ============ ANIMATED BACKGROUND ============ */
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: -3;
+    width: 100vw;
+    height: 100vh;
+  }
+  /* Animated gradient mesh — pure CSS, moves with mouse parallax */
+  #bg-mesh {
+    position: fixed;
+    inset: -10% -10% -10% -10%;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(45% 55% at var(--m1x, 18%) var(--m1y, 20%), rgba(139, 92, 246, 0.55) 0%, transparent 65%),
+      radial-gradient(40% 55% at var(--m2x, 82%) var(--m2y, 25%), rgba(236, 72, 153, 0.45) 0%, transparent 60%),
+      radial-gradient(50% 60% at var(--m3x, 70%) var(--m3y, 85%), rgba(59, 130, 246, 0.4) 0%, transparent 60%),
+      radial-gradient(40% 50% at var(--m4x, 15%) var(--m4y, 80%), rgba(245, 158, 11, 0.25) 0%, transparent 55%);
+    filter: blur(60px) saturate(1.4);
+    animation: meshFloat 18s ease-in-out infinite;
+    opacity: 0.75;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes meshFloat {
+    0%, 100% { --m1x: 18%; --m1y: 20%; --m2x: 82%; --m2y: 25%; --m3x: 70%; --m3y: 85%; --m4x: 15%; --m4y: 80%; transform: scale(1); }
+    33%      { --m1x: 30%; --m1y: 45%; --m2x: 65%; --m2y: 15%; --m3x: 85%; --m3y: 70%; --m4x: 10%; --m4y: 60%; transform: scale(1.05); }
+    66%      { --m1x: 10%; --m1y: 60%; --m2x: 90%; --m2y: 50%; --m3x: 55%; --m3y: 90%; --m4x: 30%; --m4y: 35%; transform: scale(1.02); }
+  }
+  /* Vignette & dim overlay */
+  #bg-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at center, transparent 0%, rgba(5, 5, 16, 0.4) 70%, rgba(5, 5, 16, 0.85) 100%);
+  }
+
+  /* ============ NAV (TABS) ============ */
+  nav.top {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 50;
+    background: linear-gradient(180deg, rgba(5, 5, 16, 0.85) 0%, rgba(5, 5, 16, 0) 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 26px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .brand-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--secondary), var(--warm));
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.5);
+    position: relative;
+    overflow: hidden;
+  }
+  .brand-dot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: conic-gradient(from 0deg, rgba(255,255,255,0.3), transparent 30%);
+    animation: brandSpin 4s linear infinite;
+  }
+  @keyframes brandSpin { to { transform: rotate(360deg); } }
+  .brand-name {
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: -0.4px;
+    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 4px;
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    position: relative;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: color 0.15s;
+    white-space: nowrap;
+    background: none;
+    border: none;
+    font-family: inherit;
+  }
+  .tab:hover { color: #fff; }
+  .tab.active { color: #fff; }
+  .tab.active::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(236, 72, 153, 0.18));
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    z-index: -1;
+    animation: tabIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes tabIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+  .nav-spacer { flex: 1; }
+  .nav-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, var(--accent), var(--secondary));
+    color: #fff !important;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 16px var(--glow);
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+    border: none;
+    font-family: inherit;
+  }
+  .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 22px var(--glow); }
+
+  /* ============ PAGE HOST ============ */
+  main {
+    height: 100vh;
+    padding-top: 72px;
+    overflow: hidden;
+    position: relative;
+  }
+  .page {
+    position: absolute;
+    inset: 72px 0 0 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px 32px 60px;
+    opacity: 0;
+    transform: translateY(12px) scale(0.995);
+    pointer-events: none;
+    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .page.active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .page::-webkit-scrollbar { width: 8px; }
+  .page::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 4px; }
+  .page::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.5); }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ============ HOME (HERO) ============ */
+  .hero-wrap {
+    min-height: calc(100vh - 72px - 40px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    padding: 40px 0;
+  }
+
+  /* Animated waveform — sits at the bottom of the hero as a subtle accent, not over the buttons */
+  .hero-wave {
+    position: absolute;
+    bottom: -40px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 220px;
+    z-index: 0;
+    opacity: 0.35;
+    pointer-events: none;
+    mask-image: linear-gradient(180deg, transparent 0%, black 40%, black 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 40%, black 100%);
+  }
+
+  .hero-content { position: relative; z-index: 1; }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-radius: 30px;
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    color: #c4b5fd;
+    margin-bottom: 30px;
+    backdrop-filter: blur(10px);
+    animation: heroIn 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .hero-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 10px #4ade80;
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.4); }
+  }
+
+  .hero-title {
+    font-size: clamp(64px, 14vw, 180px);
+    font-weight: 900;
+    letter-spacing: -5px;
+    line-height: 0.9;
+    background: linear-gradient(135deg, #fff 0%, #c4b5fd 30%, #ec4899 65%, #f59e0b 100%);
+    background-size: 200% 200%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 20px 60px rgba(139, 92, 246, 0.35));
+    margin-bottom: 14px;
+    animation: heroIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both, gradientShift 10s ease-in-out infinite;
+  }
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  .hero-sub {
+    font-size: clamp(15px, 1.8vw, 20px);
+    color: rgba(255, 255, 255, 0.72);
+    max-width: 640px;
+    margin: 0 auto 36px;
+    font-weight: 400;
+    animation: heroIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+  }
+  @keyframes heroIn {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .cta-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 28px;
+    animation: heroIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+  }
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 17px 32px;
+    background: linear-gradient(135deg, var(--accent), var(--secondary));
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    border-radius: 13px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+    box-shadow: 0 10px 36px var(--glow), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+    position: relative;
+    overflow: hidden;
+    font-family: inherit;
+  }
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.2) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .btn-primary:hover::before { transform: translateX(120%); }
+  .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 14px 44px var(--glow); }
+  .btn-primary .arrow { transition: transform 0.2s; }
+  .btn-primary:hover .arrow { transform: translateX(4px); }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 17px 28px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s, border-color 0.15s;
+    backdrop-filter: blur(8px);
+    font-family: inherit;
+  }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.08); transform: translateY(-3px); border-color: rgba(139, 92, 246, 0.3); }
+
+  .hero-meta {
+    font-size: 12px;
+    color: var(--text-dim);
+    animation: heroIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+    letter-spacing: 0.5px;
+  }
+  .hero-meta span { margin: 0 12px; opacity: 0.8; }
+  .hero-meta strong { color: rgba(255, 255, 255, 0.75); font-weight: 600; }
+
+  /* Stats row */
+  .hero-stats {
+    display: flex;
+    gap: 40px;
+    margin-top: 56px;
+    flex-wrap: wrap;
+    justify-content: center;
+    animation: heroIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+  }
+  .hero-stat { text-align: center; }
+  .hero-stat b {
+    display: block;
+    font-size: clamp(22px, 3vw, 32px);
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff, var(--accent-hover));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+  }
+  .hero-stat span {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* Now-playing card floating to the side (desktop only) */
+  .float-card {
+    position: absolute;
+    top: 20%;
+    right: -30px;
+    width: 280px;
+    padding: 14px;
+    background: rgba(18, 18, 32, 0.78);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 14px;
+    backdrop-filter: blur(14px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    z-index: 2;
+    transform: rotate(-6deg);
+    animation: floatCard 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.6s both, floatBob 6s ease-in-out infinite;
+  }
+  @keyframes floatCard {
+    from { opacity: 0; transform: rotate(-6deg) translateY(30px) scale(0.9); }
+    to   { opacity: 1; transform: rotate(-6deg) translateY(0) scale(1); }
+  }
+  @keyframes floatBob {
+    0%, 100% { transform: rotate(-6deg) translateY(0); }
+    50%      { transform: rotate(-5deg) translateY(-8px); }
+  }
+  .float-card-inner { display: flex; align-items: center; gap: 10px; }
+  .float-art {
+    width: 44px; height: 44px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .float-art::after {
+    content: '♪';
+    position: absolute;
+    inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #fff;
+    animation: spin 6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .float-text { flex: 1; overflow: hidden; }
+  .float-title { font-size: 13px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .float-artist { font-size: 11px; color: var(--text-muted); }
+  .float-bars {
+    display: flex; gap: 2px; align-items: flex-end;
+    height: 16px; margin-left: auto;
+  }
+  .float-bars span {
+    display: block;
+    width: 3px;
+    background: linear-gradient(180deg, var(--accent), var(--secondary));
+    border-radius: 2px;
+    animation: eqBar 1.2s ease-in-out infinite;
+  }
+  .float-bars span:nth-child(1) { animation-delay: 0s; }
+  .float-bars span:nth-child(2) { animation-delay: 0.15s; }
+  .float-bars span:nth-child(3) { animation-delay: 0.3s; }
+  .float-bars span:nth-child(4) { animation-delay: 0.45s; }
+  @keyframes eqBar {
+    0%, 100% { height: 25%; }
+    50%      { height: 100%; }
+  }
+  .float-progress {
+    height: 3px; background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px; margin-top: 10px; overflow: hidden;
+  }
+  .float-progress::after {
+    content: '';
+    display: block;
+    height: 100%;
+    width: 40%;
+    background: linear-gradient(90deg, var(--accent), var(--secondary));
+    border-radius: 2px;
+    animation: progressFill 12s ease-in-out infinite;
+  }
+  @keyframes progressFill {
+    0% { width: 10%; }
+    100% { width: 95%; }
+  }
+
+  @media (max-width: 960px) { .float-card { display: none; } }
+
+  /* ============ SECTION HEADS ============ */
+  .section-head {
+    text-align: center;
+    margin-bottom: 50px;
+    padding-top: 20px;
+  }
+  .kicker {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent-hover);
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+  .title {
+    font-size: clamp(32px, 5vw, 54px);
+    font-weight: 900;
+    letter-spacing: -1.5px;
+    line-height: 1.05;
+    background: linear-gradient(135deg, #fff 0%, #c4b5fd 80%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    font-size: 16px;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 14px auto 0;
+  }
+
+  /* ============ FEATURES ============ */
+  /* Bento grid: some cards span 2 columns for visual rhythm */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+    grid-auto-flow: row dense;
+  }
+  .feature-card {
+    position: relative;
+    padding: 26px 24px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    backdrop-filter: blur(14px);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s, box-shadow 0.3s;
+    overflow: hidden;
+    grid-column: span 2; /* default = 2/6 = 3 per row */
+  }
+  .feature-card.wide  { grid-column: span 3; }
+  .feature-card.hero  { grid-column: span 4; min-height: 260px; }
+  .feature-card.tall  { grid-column: span 2; min-height: 300px; }
+
+  @media (max-width: 900px) {
+    .feature-grid { grid-template-columns: repeat(4, 1fr); }
+    .feature-card, .feature-card.wide { grid-column: span 2; }
+    .feature-card.hero { grid-column: span 4; }
+  }
+  @media (max-width: 600px) {
+    .feature-grid { grid-template-columns: 1fr; }
+    .feature-card, .feature-card.wide, .feature-card.hero, .feature-card.tall { grid-column: span 1; min-height: auto; }
+  }
+
+  /* Spotlight that follows the cursor inside the card */
+  .feature-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, var(--feat-color, var(--accent)) 30%, transparent) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.25s;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .feature-card:hover::after { opacity: 1; }
+
+  /* Faint animated conic aura */
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: conic-gradient(from 0deg, transparent 0%, var(--feat-color, var(--accent)) 15%, transparent 35%);
+    opacity: 0;
+    transition: opacity 0.5s;
+    z-index: 0;
+    filter: blur(50px);
+    animation: cardSpin 10s linear infinite;
+  }
+  @keyframes cardSpin { to { transform: rotate(360deg); } }
+  .feature-card:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--feat-color, var(--accent)) 40%, var(--border)); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); }
+  .feature-card:hover::before { opacity: 0.28; }
+  .feature-card > * { position: relative; z-index: 1; }
+
+  .feature-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--feat-color, var(--accent)) 80%, #fff);
+    padding: 3px 9px;
+    background: color-mix(in srgb, var(--feat-color, var(--accent)) 15%, transparent);
+    border: 1px solid color-mix(in srgb, var(--feat-color, var(--accent)) 30%, transparent);
+    border-radius: 20px;
+    margin-bottom: 14px;
+  }
+
+  .feature-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--feat-color, var(--accent)), var(--feat-color-2, var(--secondary)));
+    font-size: 22px;
+    margin-bottom: 14px;
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--feat-color, var(--accent)) 50%, transparent);
+  }
+  .feature-card.hero .feature-icon { width: 64px; height: 64px; font-size: 30px; }
+  .feature-card.hero .feature-title { font-size: clamp(22px, 2.4vw, 28px); }
+  .feature-card.hero .feature-body { font-size: 15px; max-width: 560px; }
+
+  .feature-title {
+    font-size: 18px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    color: #fff;
+    letter-spacing: -0.4px;
+  }
+  .feature-body {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  /* Mini visual showcase inside the hero feature card */
+  .feature-showcase {
+    position: absolute;
+    right: -30px;
+    bottom: -30px;
+    width: 220px;
+    height: 180px;
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .feature-showcase .deck {
+    position: absolute;
+    width: 90px;
+    height: 110px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.4), rgba(139, 92, 246, 0.08));
+    border: 1px solid rgba(139, 92, 246, 0.3);
+  }
+  .feature-showcase .deck.a { right: 100px; bottom: 20px; transform: rotate(-6deg); }
+  .feature-showcase .deck.b {
+    right: 10px; bottom: 20px; transform: rotate(6deg);
+    background: linear-gradient(180deg, rgba(236, 72, 153, 0.4), rgba(236, 72, 153, 0.08));
+    border-color: rgba(236, 72, 153, 0.3);
+  }
+  .feature-showcase .deck::before {
+    content: '';
+    position: absolute;
+    top: 12px; left: 50%;
+    transform: translateX(-50%);
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff 0%, var(--feat-color, var(--accent)) 70%, transparent 100%);
+    opacity: 0.8;
+    animation: spin 4s linear infinite;
+  }
+  .feature-showcase .deck.a::before { animation-duration: 5s; }
+  .feature-showcase .deck.b::before { background: radial-gradient(circle at 35% 35%, #fff 0%, #ec4899 70%, transparent 100%); }
+
+  /* Stats above the features grid */
+  .feature-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+  .feature-stat {
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .feature-stat:hover { transform: translateY(-2px); border-color: rgba(139, 92, 246, 0.25); }
+  .feature-stat b {
+    display: block;
+    font-size: 26px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #fff, #c4b5fd);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.5px;
+    margin-bottom: 2px;
+  }
+  .feature-stat span {
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  /* Category divider */
+  .feature-category {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 20px 0 0 0;
+    padding: 0 4px;
+  }
+  .feature-category b {
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent-hover);
+    font-weight: 700;
+  }
+  .feature-category::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.3), transparent);
+  }
+
+  /* ============ GALLERY ============ */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .shot {
+    position: relative;
+    aspect-ratio: 16/10;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(236, 72, 153, 0.04));
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s;
+    cursor: pointer;
+  }
+  .shot:hover { transform: scale(1.02); border-color: rgba(139, 92, 246, 0.4); }
+  .shot img { width: 100%; height: 100%; object-fit: cover; }
+  .shot .ph {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    gap: 8px;
+    background:
+      repeating-linear-gradient(45deg, rgba(139, 92, 246, 0.04) 0 10px, transparent 10px 20px),
+      radial-gradient(ellipse at center, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+  }
+  .shot .ph b { color: var(--text-muted); font-weight: 600; font-size: 14px; }
+  .shot .tag {
+    position: absolute;
+    top: 12px; left: 12px;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(8px);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .shot.big { grid-column: span 2; }
+  @media (max-width: 780px) { .shot.big { grid-column: span 1; } }
+
+  /* ============ ABOUT ============ */
+  .about-card, .download-card, .donate-card {
+    padding: 48px;
+    border-radius: 22px;
+    backdrop-filter: blur(16px);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .about-card {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(236, 72, 153, 0.05));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+  }
+  .about-card h3 {
+    font-size: clamp(26px, 3.6vw, 40px);
+    font-weight: 900;
+    letter-spacing: -0.8px;
+    margin-bottom: 18px;
+  }
+  .about-card h3 span {
+    background: linear-gradient(135deg, var(--accent), var(--secondary), var(--warm));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .about-card p {
+    color: var(--text-muted);
+    max-width: 640px;
+    margin: 0 auto 18px;
+    font-size: 15px;
+  }
+  .creator-row {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 24px;
+  }
+  .creator-pill {
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .creator-pill strong { color: #fff; font-weight: 600; margin-left: 6px; }
+
+  .values-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-top: 32px;
+    text-align: left;
+  }
+  .value {
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .value b { display: block; color: #fff; font-size: 13px; margin-bottom: 4px; }
+  .value p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+  /* ============ DOWNLOAD ============ */
+  .download-card {
+    background:
+      radial-gradient(ellipse at top, rgba(139, 92, 246, 0.22) 0%, transparent 70%),
+      rgba(18, 18, 32, 0.6);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+  }
+  .dl-version {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    color: var(--accent-hover);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    border-radius: 20px;
+    margin-bottom: 18px;
+  }
+  .download-card h3 {
+    font-size: clamp(26px, 3.8vw, 44px);
+    font-weight: 900;
+    letter-spacing: -0.8px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #fff, #c4b5fd);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .download-card p { color: var(--text-muted); max-width: 520px; margin: 0 auto 28px; font-size: 15px; }
+  .dl-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 22px; }
+  .dl-reqs {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .dl-extras {
+    margin-top: 36px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    text-align: left;
+  }
+  .dl-extras h4 {
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .dl-extra-list {
+    list-style: none;
+    max-width: 560px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .dl-extra-list li {
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .dl-extra-list li::before { content: '›  '; color: var(--accent); font-weight: 700; }
+
+  /* Dependencies .bat download card */
+  .download-extras-card {
+    margin-top: 20px;
+    padding: 24px 28px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(139, 92, 246, 0.06));
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    backdrop-filter: blur(12px);
+  }
+  .dep-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .dep-icon {
+    width: 52px; height: 52px;
+    border-radius: 13px;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    flex-shrink: 0;
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  }
+  .dep-info { flex: 1; text-align: left; }
+  .dep-info h4 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+  }
+  .dep-info p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0;
+    max-width: 480px;
+    line-height: 1.5;
+  }
+  .dep-btn { padding: 12px 22px !important; font-size: 13px !important; flex-shrink: 0; }
+  @media (max-width: 640px) {
+    .dep-row { flex-direction: column; text-align: center; }
+    .dep-info { text-align: center; }
+  }
+
+  /* ============ DONATE ============ */
+  .donate-card {
+    background:
+      radial-gradient(ellipse at top, rgba(236, 72, 153, 0.22) 0%, transparent 70%),
+      rgba(18, 18, 32, 0.6);
+    border: 1px solid rgba(236, 72, 153, 0.3);
+  }
+  .donate-card h3 {
+    font-size: clamp(26px, 3.8vw, 42px);
+    font-weight: 900;
+    letter-spacing: -0.8px;
+    margin-bottom: 14px;
+  }
+  .donate-card p { color: var(--text-muted); max-width: 500px; margin: 0 auto 28px; font-size: 15px; }
+  .donate-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 17px 36px;
+    background: linear-gradient(135deg, #ec4899, #f59e0b);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 13px;
+    box-shadow: 0 10px 32px rgba(236, 72, 153, 0.42);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .donate-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 40px rgba(236, 72, 153, 0.6); }
+
+  /* ============ FOOTER (inside Home) ============ */
+  .home-footer {
+    margin-top: 80px;
+    padding: 30px 0 10px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+  }
+  .home-footer .links { margin-bottom: 10px; display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; }
+  .home-footer a { color: var(--text-muted); transition: color 0.15s; }
+  .home-footer a:hover { color: #fff; }
+
+  /* ============ REVEAL ============ */
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+
+  /* Responsive tweaks */
+  @media (max-width: 720px) {
+    nav.top { padding: 10px 14px; gap: 8px; }
+    .brand-name { display: none; }
+    .nav-cta { padding: 7px 12px; font-size: 12px; }
+    .about-card, .download-card, .donate-card { padding: 32px 22px; }
+    .page { padding: 16px 18px 40px; }
+    main { padding-top: 64px; }
+    .page { top: 64px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Animated background layers -->
+<canvas id="bg-canvas"></canvas>
+<div id="bg-mesh"></div>
+<div id="bg-vignette"></div>
+
+<!-- Tab nav -->
+<nav class="top">
+  <div class="brand" data-tab="home">
+    <div class="brand-dot"></div>
+    <div class="brand-name">Versefy</div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="home" role="tab">Home</button>
+    <button class="tab" data-tab="features" role="tab">Features</button>
+    <button class="tab" data-tab="preview" role="tab">Preview</button>
+    <button class="tab" data-tab="about" role="tab">About</button>
+    <button class="tab" data-tab="download" role="tab">Download</button>
+    <button class="tab" data-tab="donate" role="tab">Donate</button>
+  </div>
+  <div class="nav-spacer"></div>
+  <button class="nav-cta" data-tab="download">⬇ Get Versefy</button>
+</nav>
+
+<main>
+
+  <!-- ============ HOME ============ -->
+  <section class="page active" data-page="home">
+    <div class="container">
+      <div class="hero-wrap">
+
+        <!-- Floating "now playing" card -->
+        <div class="float-card">
+          <div class="float-card-inner">
+            <div class="float-art"></div>
+            <div class="float-text">
+              <div class="float-title">Resonance</div>
+              <div class="float-artist">HOME · Odyssey</div>
+            </div>
+            <div class="float-bars">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="float-progress"></div>
+        </div>
+
+        <!-- Animated SVG wave behind title -->
+        <svg class="hero-wave" viewBox="0 0 1000 340" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="wg1" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.3"/>
+              <stop offset="50%" stop-color="#ec4899" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.3"/>
+            </linearGradient>
+            <linearGradient id="wg2" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.25"/>
+              <stop offset="50%" stop-color="#8b5cf6" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#ec4899" stop-opacity="0.25"/>
+            </linearGradient>
+          </defs>
+          <path id="wave1" d="M0,170 Q250,60 500,170 T1000,170 L1000,340 L0,340 Z" fill="url(#wg1)"/>
+          <path id="wave2" d="M0,200 Q250,110 500,200 T1000,200 L1000,340 L0,340 Z" fill="url(#wg2)" opacity="0.6"/>
+        </svg>
+
+        <div class="hero-content">
+          <div class="hero-badge" id="version-badge">Loading latest release…</div>
+          <h1 class="hero-title">Versefy</h1>
+          <p class="hero-sub">
+            The free desktop music player that does it all.
+            DJ mixer, reactive visualizers, YouTube imports, Discord presence &mdash; fully local.
+          </p>
+
+          <div class="cta-row">
+            <a class="btn-primary" id="download-btn" href="https://github.com/Verse2334/VerseFy/releases/latest" target="_blank" rel="noopener">
+              <span>Download for Windows</span>
+              <span class="arrow">→</span>
+            </a>
+            <button class="btn-secondary" data-tab="features">
+              <span>See features</span>
+            </button>
+          </div>
+
+          <div class="hero-meta">
+            <span><strong>Free</strong> forever</span>
+            <span>·</span>
+            <span><strong>100%</strong> offline</span>
+            <span>·</span>
+            <span><strong>Zero</strong> tracking</span>
+            <span>·</span>
+            <span>Windows 10/11</span>
+          </div>
+
+          <div class="hero-stats">
+            <div class="hero-stat">
+              <b>8</b><span>Visualizer themes</span>
+            </div>
+            <div class="hero-stat">
+              <b>∞</b><span>Local storage</span>
+            </div>
+            <div class="hero-stat">
+              <b>0</b><span>Ads ever</span>
+            </div>
+            <div class="hero-stat">
+              <b>100%</b><span>Open source</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="home-footer">
+        <div class="links">
+          <a data-tab="about" style="cursor:pointer">About</a>
+          <a href="https://github.com/Verse2334/VerseFy" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/Verse2334/VerseFy/issues" target="_blank" rel="noopener">Report a bug</a>
+          <a data-tab="donate" style="cursor:pointer">Support</a>
+        </div>
+        <div>Made with ♡ by Verse &mdash; free community software.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section class="page" data-page="features">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="kicker">What's inside</span>
+        <h2 class="title">A serious toolbox<br />disguised as a music player.</h2>
+        <p class="subtitle">Every feature runs on your machine. No cloud. No catches.</p>
+      </div>
+
+      <!-- Stat bar -->
+      <div class="feature-stats reveal">
+        <div class="feature-stat"><b>11+</b><span>Core features</span></div>
+        <div class="feature-stat"><b>8</b><span>Visualizer themes</span></div>
+        <div class="feature-stat"><b>3-band</b><span>DJ EQ per deck</span></div>
+        <div class="feature-stat"><b>∞</b><span>Library size</span></div>
+      </div>
+
+      <div class="feature-grid">
+
+        <!-- CATEGORY: Mixing & performance -->
+        <div class="feature-category reveal"><b>Mixing &amp; performance</b></div>
+
+        <!-- HERO card: DJ Mode (spans 4/6) -->
+        <div class="feature-card hero reveal" style="--feat-color:#8b5cf6;--feat-color-2:#6366f1">
+          <span class="feature-tag">Flagship</span>
+          <div class="feature-icon">🎛️</div>
+          <h3 class="feature-title">DJ Mode — two decks, live crossfader</h3>
+          <p class="feature-body">Load any song on either deck. Equal-power crossfader for seamless blends, per-deck tempo and 3-band EQ, spinning vinyl platters synced to playback, and quick-fade macros built in.</p>
+          <div class="feature-showcase">
+            <div class="deck a"></div>
+            <div class="deck b"></div>
+          </div>
+        </div>
+
+        <!-- Spatial (tall, 2/6) -->
+        <div class="feature-card tall reveal" style="--feat-color:#ec4899;--feat-color-2:#f472b6">
+          <span class="feature-tag">Immersive</span>
+          <div class="feature-icon">🎧</div>
+          <h3 class="feature-title">Spatial Audio Pad</h3>
+          <p class="feature-body">Drag a ball across a pad to position sound exactly in your headphones. X maps to stereo pan, Y maps to depth via a lowpass filter + gain.</p>
+        </div>
+
+        <!-- Visualizers (wide, 3/6) -->
+        <div class="feature-card wide reveal" style="--feat-color:#3b82f6;--feat-color-2:#8b5cf6">
+          <span class="feature-tag">Visual</span>
+          <div class="feature-icon">🌊</div>
+          <h3 class="feature-title">8 reactive visualizers</h3>
+          <p class="feature-body">Radial, Bars, Wave, Galaxy, Earth, City, Aurora, Ocean — each beat-reactive and GPU-optimized. Set any of them as your desktop wallpaper.</p>
+        </div>
+
+        <!-- Full audio chain (wide, 3/6) -->
+        <div class="feature-card wide reveal" style="--feat-color:#06b6d4;--feat-color-2:#3b82f6">
+          <span class="feature-tag">Audio</span>
+          <div class="feature-icon">🎚️</div>
+          <h3 class="feature-title">Full audio chain</h3>
+          <p class="feature-body">6-band EQ with magic-wand drawing, adjustable bass boost, pitch shift, reverb, 8D, karaoke, mono and normalization.</p>
+        </div>
+
+        <!-- CATEGORY: Content & library -->
+        <div class="feature-category reveal"><b>Content &amp; library</b></div>
+
+        <div class="feature-card reveal" style="--feat-color:#f59e0b;--feat-color-2:#ec4899">
+          <span class="feature-tag">Import</span>
+          <div class="feature-icon">📥</div>
+          <h3 class="feature-title">YouTube Import</h3>
+          <p class="feature-body">Paste a URL, get the audio. Uses yt-dlp + ffmpeg locally — no account touch.</p>
+        </div>
+
+        <div class="feature-card reveal" style="--feat-color:#a855f7;--feat-color-2:#ec4899">
+          <span class="feature-tag">Theming</span>
+          <div class="feature-icon">🎬</div>
+          <h3 class="feature-title">Video Background</h3>
+          <p class="feature-body">Any YouTube link or local file as the app's live background. Library of clips, opacity slider, up to 4 GB.</p>
+        </div>
+
+        <div class="feature-card reveal" style="--feat-color:#f472b6;--feat-color-2:#8b5cf6">
+          <span class="feature-tag">SFX</span>
+          <div class="feature-icon">🎙️</div>
+          <h3 class="feature-title">SFX Suite</h3>
+          <p class="feature-body">Manage sound effects, record via mic, trim + equalize in the built-in editor, export as WAV.</p>
+        </div>
+
+        <!-- CATEGORY: Sharing -->
+        <div class="feature-category reveal"><b>Sharing &amp; insights</b></div>
+
+        <div class="feature-card wide reveal" style="--feat-color:#22c55e;--feat-color-2:#3b82f6">
+          <span class="feature-tag">Stats</span>
+          <div class="feature-icon">✨</div>
+          <h3 class="feature-title">Monthly Wrapped</h3>
+          <p class="feature-body">A cinematic recap of your month. Top songs, top artists, hours listened — counted only while you're actually playing. Shown during the 3-day window around month-end.</p>
+        </div>
+
+        <div class="feature-card wide reveal" style="--feat-color:#ec4899;--feat-color-2:#f59e0b">
+          <span class="feature-tag">Network</span>
+          <div class="feature-icon">📡</div>
+          <h3 class="feature-title">Local Network Share</h3>
+          <p class="feature-body">Broadcast a track to devices on your Wi-Fi — user-initiated, stays on your LAN, never touches the internet.</p>
+        </div>
+
+        <!-- CATEGORY: Privacy & customization -->
+        <div class="feature-category reveal"><b>Privacy &amp; customization</b></div>
+
+        <div class="feature-card wide reveal" style="--feat-color:#4ade80;--feat-color-2:#22c55e">
+          <span class="feature-tag">Privacy</span>
+          <div class="feature-icon">🛡️</div>
+          <h3 class="feature-title">Private by design</h3>
+          <p class="feature-body">No backend. No analytics. No accounts. No cookies. No outbound requests (except YouTube &amp; opt-in Discord RPC).</p>
+        </div>
+
+        <div class="feature-card wide reveal" style="--feat-color:#f59e0b;--feat-color-2:#ec4899">
+          <span class="feature-tag">Customize</span>
+          <div class="feature-icon">🎨</div>
+          <h3 class="feature-title">Deep customization</h3>
+          <p class="feature-body">Themes, custom fonts, custom CSS injection, global hotkeys, OBS overlay, theater mode, screensaver.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PREVIEW ============ -->
+  <section class="page" data-page="preview">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="kicker">Preview</span>
+        <h2 class="title">Built with care,<br />every pixel.</h2>
+        <p class="subtitle">Drop PNGs into <code>docs/screenshots/</code> and they appear here automatically.</p>
+      </div>
+
+      <div class="gallery-grid">
+        <div class="shot big reveal">
+          <span class="tag">Home</span>
+          <img src="screenshots/home.png" alt="Home" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="ph" style="display:none"><b>home.png</b><small>1600×900</small></div>
+        </div>
+        <div class="shot reveal">
+          <span class="tag">DJ Mode</span>
+          <img src="screenshots/dj.png" alt="DJ Mode" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="ph" style="display:none"><b>dj.png</b><small>2-deck mixer</small></div>
+        </div>
+        <div class="shot reveal">
+          <span class="tag">Visualizer</span>
+          <img src="screenshots/visualizer.png" alt="Visualizer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="ph" style="display:none"><b>visualizer.png</b><small>Beat-reactive</small></div>
+        </div>
+        <div class="shot reveal">
+          <span class="tag">Equalizer</span>
+          <img src="screenshots/equalizer.png" alt="Equalizer" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="ph" style="display:none"><b>equalizer.png</b><small>EQ + advanced</small></div>
+        </div>
+        <div class="shot reveal">
+          <span class="tag">Wrapped</span>
+          <img src="screenshots/wrapped.png" alt="Wrapped" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="ph" style="display:none"><b>wrapped.png</b><small>Monthly recap</small></div>
+        </div>
+        <div class="shot big reveal">
+          <span class="tag">Library</span>
+          <img src="screenshots/library.png" alt="Library" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="ph" style="display:none"><b>library.png</b><small>1600×900</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ABOUT ============ -->
+  <section class="page" data-page="about">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="kicker">Who's behind it</span>
+        <h2 class="title">Built for the community.</h2>
+      </div>
+
+      <div class="about-card reveal">
+        <h3>Made by <span>Verse</span>.</h3>
+        <p>
+          Versefy is a passion project. It's free, it will always stay free, and it won't be sold, rebranded
+          or commercialised. There's no NSFW use permitted, no resale, no catches. Just music software
+          made the way it should be &mdash; yours, and yours alone.
+        </p>
+        <div class="creator-row">
+          <div class="creator-pill">Twitter/X <strong>@verse_3dd</strong></div>
+          <div class="creator-pill">Discord <strong>verse_3d</strong></div>
+        </div>
+
+        <div class="values-grid">
+          <div class="value">
+            <b>Free forever</b>
+            <p>No subscriptions, no upsells, no "pro tier". Ever.</p>
+          </div>
+          <div class="value">
+            <b>Fully offline</b>
+            <p>Runs on your device. No servers hosting your data.</p>
+          </div>
+          <div class="value">
+            <b>Zero tracking</b>
+            <p>No analytics, no telemetry, no account required.</p>
+          </div>
+          <div class="value">
+            <b>Open source</b>
+            <p>Code on GitHub. Inspect anything, fork anything.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DOWNLOAD ============ -->
+  <section class="page" data-page="download">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="kicker">Get it now</span>
+        <h2 class="title">Install in 30 seconds.</h2>
+      </div>
+
+      <div class="download-card reveal">
+        <span class="dl-version" id="dl-version">v1.0.0</span>
+        <h3>Download Versefy</h3>
+        <p>The installer auto-updates from GitHub — this is always the latest release.</p>
+
+        <div class="dl-btns">
+          <a class="btn-primary" id="download-btn-main" href="https://github.com/Verse2334/VerseFy/releases/latest" target="_blank" rel="noopener">
+            <span>Windows installer (.exe)</span>
+            <span class="arrow">→</span>
+          </a>
+          <a class="btn-secondary" href="https://github.com/Verse2334/VerseFy/releases" target="_blank" rel="noopener">
+            All releases
+          </a>
+        </div>
+
+        <div class="dl-reqs">
+          Requires Windows 10 or 11 · ~80 MB installer
+        </div>
+      </div>
+
+      <!-- Dependencies installer card -->
+      <div class="download-extras-card reveal">
+        <div class="dep-row">
+          <div class="dep-icon">⚙️</div>
+          <div class="dep-info">
+            <h4>Install-Versefy-Dependencies.bat</h4>
+            <p>One-click script that installs <b>yt-dlp</b>, <b>ffmpeg</b> and <b>deno</b> — required for YouTube imports and video background downloads. Run once after installing Versefy.</p>
+          </div>
+          <a class="btn-secondary dep-btn" id="deps-btn" href="https://github.com/Verse2334/VerseFy/releases/latest" target="_blank" rel="noopener">
+            <span>Download .bat</span>
+            <span class="arrow">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Post-install instructions -->
+      <div class="download-card reveal" style="margin-top:20px;padding:36px 32px;">
+        <h4 style="font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--accent-hover);margin-bottom:18px;font-weight:700;">After installing</h4>
+        <ul class="dl-extra-list">
+          <li><b>Run the installer.</b> Your Start menu + desktop get a Versefy shortcut.</li>
+          <li><b>Run <code>Install-Versefy-Dependencies.bat</code></b> once — this enables YouTube / video-bg imports. Safe to re-run anytime.</li>
+          <li><b>Open Versefy</b>, go to <b>Upload</b>, and drop any audio file (MP3/WAV/FLAC…) or paste a YouTube URL.</li>
+          <li><b>Tweak Settings</b> — themes, EQ, hotkeys. Enable DJ Mode + Video Background there too.</li>
+          <li><b>Tutorial:</b> the first launch runs a short tour. Re-run it any time from Settings.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DONATE ============ -->
+  <section class="page" data-page="donate">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="kicker">Support</span>
+        <h2 class="title">Free stays free.<br />Tips keep it going.</h2>
+      </div>
+
+      <div class="donate-card reveal">
+        <h3>Enjoying Versefy?</h3>
+        <p>It's a passion project — if it's become part of your day, a small tip helps fund new features, icons, and the occasional rubber duck. No pressure either way.</p>
+        <a class="donate-btn" href="https://ko-fi.com/versefy" target="_blank" rel="noopener">
+          ☕ Support on Ko-fi
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// =====================================================================
+// Mesh gradient parallax: subtle follow on mouse movement
+// =====================================================================
+(() => {
+  const mesh = document.getElementById('bg-mesh');
+  if (!mesh || window.matchMedia('(max-width: 720px)').matches) return;
+  let targetX = 0, targetY = 0, curX = 0, curY = 0, raf = null;
+  const loop = () => {
+    curX += (targetX - curX) * 0.08;
+    curY += (targetY - curY) * 0.08;
+    mesh.style.transform = `translate(${curX}px, ${curY}px)`;
+    raf = requestAnimationFrame(loop);
+  };
+  window.addEventListener('mousemove', (e) => {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    targetX = ((e.clientX - cx) / cx) * -18;
+    targetY = ((e.clientY - cy) / cy) * -12;
+    if (!raf) raf = requestAnimationFrame(loop);
+  });
+})();
+
+// =====================================================================
+// Canvas background: twinkling stars + subtle drifting particles
+// (lightweight, pauses on hidden tab)
+// =====================================================================
+(() => {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let w, h, lastFrame = 0, raf;
+  const TARGET_MS = 1000 / 30;
+
+  function resize() {
+    w = Math.min(1600, window.innerWidth);
+    h = Math.min(1400, window.innerHeight);
+    canvas.width = w; canvas.height = h;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const stars = Array.from({ length: 120 }, () => ({
+    x: Math.random() * 1600,
+    y: Math.random() * 1400,
+    s: 0.5 + Math.random() * 1.5,
+    a: 0.2 + Math.random() * 0.5,
+    t: Math.random() * Math.PI * 2,
+    v: 0.015 + Math.random() * 0.04,
+  }));
+
+  // Drifting particles
+  const parts = Array.from({ length: 25 }, () => ({
+    x: Math.random() * 1600,
+    y: Math.random() * 1400,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    r: 1 + Math.random() * 2,
+    hue: Math.random() > 0.5 ? 270 : 320,
+  }));
+
+  function draw(now) {
+    if (document.hidden) { raf = requestAnimationFrame(draw); return; }
+    if (now - lastFrame < TARGET_MS) { raf = requestAnimationFrame(draw); return; }
+    lastFrame = now;
+
+    ctx.clearRect(0, 0, w, h);
+
+    // Stars (twinkling)
+    ctx.fillStyle = '#fff';
+    for (const s of stars) {
+      s.t += s.v;
+      const a = s.a + Math.sin(s.t) * 0.2;
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.fillRect((s.x % w), (s.y % h), s.s, s.s);
+    }
+
+    // Particles (soft drifting)
+    for (const p of parts) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < -10) p.x = w + 10; if (p.x > w + 10) p.x = -10;
+      if (p.y < -10) p.y = h + 10; if (p.y > h + 10) p.y = -10;
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = `hsl(${p.hue}, 80%, 70%)`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    raf = requestAnimationFrame(draw);
+  }
+  raf = requestAnimationFrame(draw);
+})();
+
+// =====================================================================
+// SVG wave morph behind hero title (pure geometry, very cheap)
+// =====================================================================
+(() => {
+  const w1 = document.getElementById('wave1');
+  const w2 = document.getElementById('wave2');
+  if (!w1 || !w2) return;
+  let t = 0;
+  function path(offset, yBase, amp) {
+    const pts = [];
+    for (let x = 0; x <= 1000; x += 50) {
+      const y = yBase + Math.sin(x * 0.008 + t + offset) * amp
+                      + Math.sin(x * 0.003 - t * 0.5 + offset) * (amp * 0.5);
+      pts.push(`${x},${y.toFixed(1)}`);
+    }
+    return `M0,${yBase} L${pts.join(' L')} L1000,340 L0,340 Z`;
+  }
+  function tick() {
+    t += 0.02;
+    w1.setAttribute('d', path(0, 170, 30));
+    w2.setAttribute('d', path(1, 210, 25));
+    requestAnimationFrame(tick);
+  }
+  tick();
+})();
+
+// =====================================================================
+// Tab routing: hash-based, smooth fade between pages
+// =====================================================================
+(() => {
+  const tabs = document.querySelectorAll('[data-tab]');
+  const pages = document.querySelectorAll('.page');
+
+  function normalize(name) {
+    const valid = ['home', 'features', 'preview', 'about', 'download', 'donate'];
+    return valid.includes(name) ? name : 'home';
+  }
+
+  function show(name) {
+    name = normalize(name);
+
+    pages.forEach(p => p.classList.toggle('active', p.dataset.page === name));
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+
+    // Reset scroll in the activated page
+    const active = document.querySelector(`.page[data-page="${name}"]`);
+    if (active) active.scrollTop = 0;
+
+    // Kick reveal animations on the activated page
+    requestAnimationFrame(() => {
+      if (!active) return;
+      active.querySelectorAll('.reveal').forEach((el, i) => {
+        el.classList.remove('in');
+        setTimeout(() => el.classList.add('in'), 30 + i * 60);
+      });
+    });
+
+    // Update hash without triggering another show()
+    if (location.hash !== '#/' + name) {
+      history.replaceState(null, '', '#/' + name);
+    }
+
+    document.title = name === 'home'
+      ? 'Versefy — Free desktop music player'
+      : 'Versefy — ' + name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
+  tabs.forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      show(el.dataset.tab);
+    });
+  });
+
+  window.addEventListener('hashchange', () => {
+    const m = location.hash.match(/^#\/?(\w+)/);
+    show(m ? m[1] : 'home');
+  });
+
+  // Initial load
+  const m = location.hash.match(/^#\/?(\w+)/);
+  show(m ? m[1] : 'home');
+})();
+
+// =====================================================================
+// GitHub Releases: populate download button + version badge
+// =====================================================================
+(async () => {
+  const badge = document.getElementById('version-badge');
+  const btn = document.getElementById('download-btn');
+  const btnMain = document.getElementById('download-btn-main');
+  const dlVersion = document.getElementById('dl-version');
+  const fallbackUrl = 'https://github.com/Verse2334/VerseFy/releases/latest';
+
+  try {
+    const resp = await fetch('https://api.github.com/repos/Verse2334/VerseFy/releases/latest', {
+      headers: { 'Accept': 'application/vnd.github+json' },
+    });
+    if (!resp.ok) throw new Error('bad status ' + resp.status);
+    const rel = await resp.json();
+
+    const exe = (rel.assets || []).find(a =>
+      /\.exe$/i.test(a.name) && /setup|install|versefy/i.test(a.name)
+    ) || (rel.assets || []).find(a => /\.exe$/i.test(a.name));
+
+    const bat = (rel.assets || []).find(a => /\.bat$/i.test(a.name) && /depend|install/i.test(a.name))
+             || (rel.assets || []).find(a => /\.bat$/i.test(a.name));
+
+    const version = (rel.tag_name || rel.name || '').replace(/^v/, '') || '1.0.0';
+    const sizeMb = exe && exe.size ? ` · ${(exe.size / 1024 / 1024).toFixed(1)} MB` : '';
+
+    if (badge) badge.innerHTML = `Latest release &mdash; <strong style="color:#fff;margin-left:6px">v${version}</strong>`;
+    if (dlVersion) dlVersion.textContent = `v${version}`;
+
+    if (exe) {
+      if (btn)     { btn.href     = exe.browser_download_url; btn.querySelector('span').textContent     = `Download v${version}${sizeMb}`; }
+      if (btnMain) { btnMain.href = exe.browser_download_url; btnMain.querySelector('span').textContent = `Windows installer · v${version}${sizeMb}`; }
+    } else {
+      const url = rel.html_url || fallbackUrl;
+      if (btn)     { btn.href     = url; btn.querySelector('span').textContent     = `Download v${version} (GitHub)`; }
+      if (btnMain) { btnMain.href = url; btnMain.querySelector('span').textContent = `Latest release on GitHub`; }
+    }
+
+    const depsBtn = document.getElementById('deps-btn');
+    if (depsBtn && bat) {
+      depsBtn.href = bat.browser_download_url;
+      const kb = bat.size ? ` · ${(bat.size / 1024).toFixed(1)} KB` : '';
+      depsBtn.querySelector('span').textContent = `Download .bat${kb}`;
+    } else if (depsBtn) {
+      depsBtn.href = rel.html_url || fallbackUrl;
+    }
+  } catch (err) {
+    if (badge) badge.textContent = 'Latest release on GitHub';
+    if (btn)     btn.href     = fallbackUrl;
+    if (btnMain) btnMain.href = fallbackUrl;
+  }
+})();
+
+// =====================================================================
+// Spotlight cursor-follow on feature cards
+// =====================================================================
+(() => {
+  document.querySelectorAll('.feature-card').forEach(card => {
+    card.addEventListener('pointermove', (e) => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+      card.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+    });
+  });
+})();
+
+// =====================================================================
+// IntersectionObserver reveal for anything scrolled into view
+// (within the active page)
+// =====================================================================
+(() => {
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    }
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  // Observe ALL reveal elements; the tab switcher already kicks initial reveals
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+})();
+</script>
+
+</body>
+</html>
