@@ -813,6 +813,68 @@
   .shot.big { grid-column: span 2; }
   @media (max-width: 780px) { .shot.big { grid-column: span 1; } }
 
+  /* ============ LIGHTBOX ============ */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    cursor: zoom-out;
+    animation: lbIn 0.2s ease;
+  }
+  .lightbox.open { display: flex; }
+  @keyframes lbIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .lightbox img {
+    max-width: 95vw;
+    max-height: 90vh;
+    border-radius: 12px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    animation: lbZoom 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes lbZoom {
+    from { opacity: 0; transform: scale(0.94); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: 20px; right: 20px;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .lightbox-close:hover { background: rgba(255, 255, 255, 0.18); transform: scale(1.08); }
+
+  .lightbox-caption {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 0, 0, 0.4);
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
   /* ============ ABOUT ============ */
   .about-card, .download-card, .donate-card {
     padding: 48px;
@@ -944,6 +1006,66 @@
     border-radius: 10px;
   }
   .dl-extra-list li::before { content: '›  '; color: var(--accent); font-weight: 700; }
+
+  /* Trust / safety card on the Download page */
+  .trust-card {
+    margin-top: 20px;
+    padding: 28px 32px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(34, 197, 94, 0.05));
+    border: 1px solid rgba(74, 222, 128, 0.28);
+    backdrop-filter: blur(12px);
+    text-align: left;
+  }
+  .trust-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .trust-icon {
+    font-size: 22px;
+    filter: drop-shadow(0 0 12px rgba(74, 222, 128, 0.5));
+  }
+  .trust-card h4 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.3px;
+  }
+  .trust-card > p {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+  .trust-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .trust-list li {
+    padding: 12px 14px 12px 36px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    position: relative;
+  }
+  .trust-list li::before {
+    content: '✓';
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    color: #4ade80;
+    font-weight: 900;
+    font-size: 14px;
+  }
+  .trust-list li b { color: #fff; font-weight: 700; }
+  .trust-list li a { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 2px; }
+  .trust-list li a:hover { color: #fff; }
 
   /* Dependencies .bat download card */
   .download-extras-card {
@@ -1200,10 +1322,27 @@
           <p class="feature-body">Radial, Bars, Wave, Galaxy, Earth, City, Aurora, Ocean. All beat-reactive. Set any of them as your desktop wallpaper.</p>
         </div>
 
-        <div class="feature-card wide reveal" style="--feat-color:#06b6d4;--feat-color-2:#3b82f6">
+        <!-- EQ — hype card (spans 4/6 for prominence) -->
+        <div class="feature-card hero reveal" style="--feat-color:#06b6d4;--feat-color-2:#3b82f6">
           <div class="feature-icon">🎚️</div>
-          <h3 class="feature-title">Every EQ knob you want</h3>
-          <p class="feature-body">6-band EQ (draw the curve if you want), bass boost, pitch shift, reverb, 8D, karaoke. Play, don't play — up to you.</p>
+          <h3 class="feature-title">The best EQ on any music player. Period.</h3>
+          <p class="feature-body">
+            Full 6-band EQ with presets (Bass, Treble, Vocal, Electronic, Rock, Jazz…) — or throw the
+            sliders out entirely and <b>draw your own curve</b> with the magic-wand canvas. Bass Boost with an
+            intensity slider (1–24 dB, go as hard as you want). Pitch shift ±12 semitones. Reverb with a
+            dry/wet knob. Effect modes for Nightcore and Slowed + Reverb baked in. If you can hear it, you can shape it.
+          </p>
+        </div>
+
+        <!-- 8D Audio — standalone hype card -->
+        <div class="feature-card wide reveal" style="--feat-color:#a855f7;--feat-color-2:#06b6d4">
+          <div class="feature-icon">🌀</div>
+          <h3 class="feature-title">8D Audio — real, not a TikTok gimmick</h3>
+          <p class="feature-body">
+            Put headphones on and flip it. The sound orbits your head — side-to-side, back-to-front, a full
+            rotation that actually works because it's processed through a real stereo panner, not a fake
+            preset. Every song instantly feels like a live show. Combine with Reverb and it's unfair.
+          </p>
         </div>
 
         <div class="feature-card reveal" style="--feat-color:#f59e0b;--feat-color-2:#ec4899">
@@ -1236,10 +1375,17 @@
           <p class="feature-body">Play a track on another device on your local network. Nothing leaves your house.</p>
         </div>
 
-        <div class="feature-card wide reveal" style="--feat-color:#4ade80;--feat-color-2:#22c55e">
+        <div class="feature-card hero reveal" style="--feat-color:#4ade80;--feat-color-2:#22c55e">
           <div class="feature-icon">🛡️</div>
-          <h3 class="feature-title">No tracking, no accounts</h3>
-          <p class="feature-body">There's no server. There's no login. There's no data to leak because none of it exists.</p>
+          <h3 class="feature-title">Actually safe. Not "trust me bro" safe.</h3>
+          <p class="feature-body">
+            No servers. No accounts. No analytics. No telemetry. No cookies. No outbound requests except
+            the ones you trigger yourself (YouTube imports, optional Discord presence). The full source is
+            on GitHub — read it, audit it, fork it. Some antiviruses flag unsigned indie apps; that's a
+            false positive you can confirm by inspecting the code yourself. There's literally nothing here
+            that could phone home, steal data, or hurt your machine. You run it, it runs, you close it,
+            it's gone. That's the whole deal.
+          </p>
         </div>
 
         <div class="feature-card wide reveal" style="--feat-color:#f59e0b;--feat-color-2:#ec4899">
@@ -1358,6 +1504,22 @@
         </div>
       </div>
 
+      <!-- Trust / "is this safe?" card -->
+      <div class="trust-card reveal">
+        <div class="trust-head">
+          <span class="trust-icon">🛡️</span>
+          <h4>Is this safe?</h4>
+        </div>
+        <p>Yes, genuinely. Here's why you can be sure:</p>
+        <ul class="trust-list">
+          <li><b>Fully open source.</b> Every line of code lives at <a href="https://github.com/Verse2334/VerseFy" target="_blank" rel="noopener">github.com/Verse2334/VerseFy</a>. Read it. Audit it. Build it yourself if you want.</li>
+          <li><b>Zero network activity</b> beyond what you ask for. No telemetry, no analytics, no "phone home". The only outbound traffic is YouTube imports (that you triggered) and Discord presence (if you enable it).</li>
+          <li><b>No accounts, no server, no database.</b> There isn't a single byte about you leaving your machine.</li>
+          <li><b>Antivirus false positives are a thing.</b> Unsigned indie apps built with Electron sometimes get flagged. It's not malware — it's just that a $100-a-year Microsoft signing cert is out of budget for a free community project. You can verify by checking the source or scanning the .exe on <a href="https://www.virustotal.com" target="_blank" rel="noopener">VirusTotal</a>.</li>
+          <li><b>You can wipe it cleanly.</b> Uninstall from Windows settings → everything's gone. It stores nothing outside the app folder + its own IndexedDB.</li>
+        </ul>
+      </div>
+
       <!-- Dependencies installer card -->
       <div class="download-extras-card reveal">
         <div class="dep-row">
@@ -1405,7 +1567,53 @@
 
 </main>
 
+<!-- Lightbox for screenshot previews -->
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Screenshot preview">
+  <button class="lightbox-close" id="lightbox-close" aria-label="Close">✕</button>
+  <img id="lightbox-img" src="" alt="" />
+  <div class="lightbox-caption" id="lightbox-caption"></div>
+</div>
+
 <script>
+// =====================================================================
+// Lightbox — click any screenshot to open it full-size
+// =====================================================================
+(() => {
+  const lb = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lightbox-img');
+  const lbCap = document.getElementById('lightbox-caption');
+  const lbClose = document.getElementById('lightbox-close');
+
+  function open(src, caption) {
+    lbImg.src = src;
+    lbCap.textContent = caption || '';
+    lb.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function close() {
+    lb.classList.remove('open');
+    document.body.style.overflow = '';
+    // Clear src after transition so memory is freed
+    setTimeout(() => { if (!lb.classList.contains('open')) lbImg.src = ''; }, 300);
+  }
+
+  document.querySelectorAll('.shot').forEach(shot => {
+    shot.addEventListener('click', () => {
+      const img = shot.querySelector('img');
+      const tag = shot.querySelector('.tag');
+      if (img && img.src && img.style.display !== 'none' && img.complete && img.naturalWidth > 0) {
+        open(img.src, tag ? tag.textContent : '');
+      }
+    });
+  });
+
+  lb.addEventListener('click', (e) => { if (e.target === lb) close(); });
+  lbClose.addEventListener('click', close);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lb.classList.contains('open')) close();
+  });
+})();
+
 // =====================================================================
 // Mesh gradient parallax: subtle follow on mouse movement
 // =====================================================================
