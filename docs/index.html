@@ -1038,34 +1038,43 @@
     font-size: 13px;
     margin-bottom: 14px;
   }
-  .trust-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 10px;
+    margin-top: 8px;
   }
-  .trust-list li {
-    padding: 12px 14px 12px 36px;
+  .trust-item {
+    padding: 14px 16px 14px 34px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
     border-radius: 10px;
-    font-size: 13px;
-    color: var(--text-muted);
-    line-height: 1.55;
     position: relative;
   }
-  .trust-list li::before {
+  .trust-item::before {
     content: '✓';
     position: absolute;
     left: 12px;
-    top: 12px;
+    top: 13px;
     color: #4ade80;
     font-weight: 900;
     font-size: 14px;
   }
-  .trust-list li b { color: #fff; font-weight: 700; }
-  .trust-list li a { color: var(--accent-hover); text-decoration: underline; text-underline-offset: 2px; }
-  .trust-list li a:hover { color: #fff; }
+  .trust-item b {
+    display: block;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .trust-item p {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0;
+  }
+  .trust-item a { color: var(--accent-hover); }
+  .trust-item a:hover { color: #fff; }
 
   /* Dependencies .bat download card */
   .download-extras-card {
@@ -1375,17 +1384,10 @@
           <p class="feature-body">Play a track on another device on your local network. Nothing leaves your house.</p>
         </div>
 
-        <div class="feature-card hero reveal" style="--feat-color:#4ade80;--feat-color-2:#22c55e">
+        <div class="feature-card wide reveal" style="--feat-color:#4ade80;--feat-color-2:#22c55e">
           <div class="feature-icon">🛡️</div>
-          <h3 class="feature-title">Actually safe. Not "trust me bro" safe.</h3>
-          <p class="feature-body">
-            No servers. No accounts. No analytics. No telemetry. No cookies. No outbound requests except
-            the ones you trigger yourself (YouTube imports, optional Discord presence). The full source is
-            on GitHub — read it, audit it, fork it. Some antiviruses flag unsigned indie apps; that's a
-            false positive you can confirm by inspecting the code yourself. There's literally nothing here
-            that could phone home, steal data, or hurt your machine. You run it, it runs, you close it,
-            it's gone. That's the whole deal.
-          </p>
+          <h3 class="feature-title">Yours, only yours.</h3>
+          <p class="feature-body">Runs 100% on your PC. No accounts. No analytics. No servers. The full source is on GitHub if you're curious.</p>
         </div>
 
         <div class="feature-card wide reveal" style="--feat-color:#f59e0b;--feat-color-2:#ec4899">
@@ -1504,20 +1506,30 @@
         </div>
       </div>
 
-      <!-- Trust / "is this safe?" card -->
+      <!-- Trust badges -->
       <div class="trust-card reveal">
         <div class="trust-head">
           <span class="trust-icon">🛡️</span>
-          <h4>Is this safe?</h4>
+          <h4>Built safe from day one.</h4>
         </div>
-        <p>Yes, genuinely. Here's why you can be sure:</p>
-        <ul class="trust-list">
-          <li><b>Fully open source.</b> Every line of code lives at <a href="https://github.com/Verse2334/VerseFy" target="_blank" rel="noopener">github.com/Verse2334/VerseFy</a>. Read it. Audit it. Build it yourself if you want.</li>
-          <li><b>Zero network activity</b> beyond what you ask for. No telemetry, no analytics, no "phone home". The only outbound traffic is YouTube imports (that you triggered) and Discord presence (if you enable it).</li>
-          <li><b>No accounts, no server, no database.</b> There isn't a single byte about you leaving your machine.</li>
-          <li><b>Antivirus false positives are a thing.</b> Unsigned indie apps built with Electron sometimes get flagged. It's not malware — it's just that a $100-a-year Microsoft signing cert is out of budget for a free community project. You can verify by checking the source or scanning the .exe on <a href="https://www.virustotal.com" target="_blank" rel="noopener">VirusTotal</a>.</li>
-          <li><b>You can wipe it cleanly.</b> Uninstall from Windows settings → everything's gone. It stores nothing outside the app folder + its own IndexedDB.</li>
-        </ul>
+        <div class="trust-grid">
+          <div class="trust-item">
+            <b>Open source</b>
+            <p>Every line of code is on <a href="https://github.com/Verse2334/VerseFy" target="_blank" rel="noopener">GitHub</a>. Nothing hidden.</p>
+          </div>
+          <div class="trust-item">
+            <b>Offline by default</b>
+            <p>Runs entirely on your PC. No servers, no accounts, no cloud.</p>
+          </div>
+          <div class="trust-item">
+            <b>Zero tracking</b>
+            <p>No analytics, no telemetry, no cookies. Ever.</p>
+          </div>
+          <div class="trust-item">
+            <b>Clean uninstall</b>
+            <p>Remove it from Windows settings — fully gone, nothing left behind.</p>
+          </div>
+        </div>
       </div>
 
       <!-- Dependencies installer card -->
