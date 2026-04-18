@@ -18,6 +18,10 @@ export default function SFXEditor({ song, onClose, onSaved }) {
   const audioRef = useRef(null);
   const audioCtxRef = useRef(null);
   const bufferRef = useRef(null);
+  const bassNodeRef = useRef(null);
+  const midNodeRef = useRef(null);
+  const trebleNodeRef = useRef(null);
+  const gainNodeRef = useRef(null);
 
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -49,8 +53,29 @@ export default function SFXEditor({ song, onClose, onSaved }) {
       .catch(() => {});
 
     const audio = new Audio(song.audioUrl);
+    audio.crossOrigin = 'anonymous';
     audioRef.current = audio;
     audio.addEventListener('ended', () => setPlaying(false));
+
+    // Route audio element through EQ filters for live preview
+    const source = ctx.createMediaElementSource(audio);
+    const bassNode = ctx.createBiquadFilter();
+    bassNode.type = 'lowshelf'; bassNode.frequency.value = 200; bassNode.gain.value = 0;
+    const midNode = ctx.createBiquadFilter();
+    midNode.type = 'peaking'; midNode.frequency.value = 1000; midNode.Q.value = 1; midNode.gain.value = 0;
+    const trebleNode = ctx.createBiquadFilter();
+    trebleNode.type = 'highshelf'; trebleNode.frequency.value = 4000; trebleNode.gain.value = 0;
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 1;
+    source.connect(bassNode);
+    bassNode.connect(midNode);
+    midNode.connect(trebleNode);
+    trebleNode.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    bassNodeRef.current = bassNode;
+    midNodeRef.current = midNode;
+    trebleNodeRef.current = trebleNode;
+    gainNodeRef.current = gainNode;
 
     return () => {
       audio.pause();
@@ -145,6 +170,14 @@ export default function SFXEditor({ song, onClose, onSaved }) {
     if (bufferRef.current) drawWaveform(bufferRef.current);
   }, [trimStart, trimEnd, currentTime, drawWaveform]);
 
+  // Live EQ + volume updates
+  useEffect(() => {
+    if (bassNodeRef.current) bassNodeRef.current.gain.value = bass;
+    if (midNodeRef.current) midNodeRef.current.gain.value = mid;
+    if (trebleNodeRef.current) trebleNodeRef.current.gain.value = treble;
+    if (gainNodeRef.current) gainNodeRef.current.gain.value = volume;
+  }, [bass, mid, treble, volume]);
+
   // Play/pause
   function togglePlay() {
     const audio = audioRef.current;
@@ -154,8 +187,8 @@ export default function SFXEditor({ song, onClose, onSaved }) {
       if (timeUpdateRef.current) clearInterval(timeUpdateRef.current);
       setPlaying(false);
     } else {
+      if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
       audio.currentTime = trimStart * duration;
-      audio.volume = volume;
       audio.play();
       setPlaying(true);
       timeUpdateRef.current = setInterval(() => {
@@ -352,7 +385,7 @@ export default function SFXEditor({ song, onClose, onSaved }) {
           <div className="sfx-volume-ctrl">
             <span>Vol</span>
             <input type="range" min="0" max="1.5" step="0.01" value={volume}
-              onChange={e => { setVolume(parseFloat(e.target.value)); if (audioRef.current) audioRef.current.volume = Math.min(1, parseFloat(e.target.value)); }}
+              onChange={e => setVolume(parseFloat(e.target.value))}
               className="sfx-slider" />
             <span className="sfx-slider-val">{Math.round(volume * 100)}%</span>
           </div>

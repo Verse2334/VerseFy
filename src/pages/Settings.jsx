@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import { usePlayer } from '../context/PlayerContext';
 import { findDuplicates, exportLibrary, importLibrary, deleteCompletely } from '../utils/db';
 import { getConfig as getVideoBgConfig, saveConfig as saveVideoBgConfig, addVideo, getAllVideos, deleteVideo, setActiveVideo, extractYouTubeId, formatBytes, onConfigChange as onVideoBgChange } from '../utils/videoBg';
+import { addDemoSongs, clearDemoSongs, countDemoSongs } from '../utils/devSeed';
 import './Pages.css';
 import './Settings.css';
 
@@ -37,6 +38,42 @@ export default function Settings() {
   const [obsRunning, setObsRunning] = useState(false);
   const [obsUrl, setObsUrl] = useState('');
   const [djModeEnabled, setDjModeEnabled] = useState(() => localStorage.getItem('versefy-dj-mode') === '1');
+  const [demoCount, setDemoCount] = useState(0);
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoMsg, setDemoMsg] = useState('');
+
+  useEffect(() => { countDemoSongs().then(setDemoCount).catch(() => {}); }, []);
+
+  async function handleSeedDemos() {
+    setDemoBusy(true);
+    setDemoMsg('Generating 30 demo songs…');
+    try {
+      await addDemoSongs(30);
+      const n = await countDemoSongs();
+      setDemoCount(n);
+      setDemoMsg(`Added 30 demo songs. Library now has ${n} demos.`);
+    } catch (err) {
+      setDemoMsg('Failed: ' + err.message);
+    } finally {
+      setDemoBusy(false);
+      setTimeout(() => setDemoMsg(''), 3500);
+    }
+  }
+
+  async function handleClearDemos() {
+    if (!window.confirm('Remove all demo songs? Your real uploads stay.')) return;
+    setDemoBusy(true);
+    try {
+      const removed = await clearDemoSongs();
+      setDemoCount(0);
+      setDemoMsg(`Removed ${removed} demo songs.`);
+    } catch (err) {
+      setDemoMsg('Failed: ' + err.message);
+    } finally {
+      setDemoBusy(false);
+      setTimeout(() => setDemoMsg(''), 3500);
+    }
+  }
   const [videoBg, setVideoBg] = useState(getVideoBgConfig);
   const [videoLibrary, setVideoLibrary] = useState([]);
   const [videoBgMsg, setVideoBgMsg] = useState('');
@@ -384,6 +421,39 @@ export default function Settings() {
             </button>
           ))}
         </div>
+      </section>
+
+      {/* Developer tools — seed demo data for screenshots */}
+      <section className="settings-section">
+        <div className="settings-section-header">
+          <IoHardwareChip className="settings-icon" />
+          <div>
+            <h2>Developer Tools</h2>
+            <p>Populate the library with dummy songs so you can take screenshots.</p>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            className="videobg-download-btn"
+            onClick={handleSeedDemos}
+            disabled={demoBusy}
+            style={{ background: 'linear-gradient(135deg, #8b5cf6, #3b82f6)' }}
+          >
+            <IoCloudDownload /> {demoBusy ? 'Working…' : 'Add 30 demo songs'}
+          </button>
+          <button
+            className="videobg-tab"
+            onClick={handleClearDemos}
+            disabled={demoBusy || demoCount === 0}
+            style={{ padding: '10px 16px' }}
+          >
+            <IoTrash /> Remove demos ({demoCount})
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            Each demo is a silent audio blob + procedural artwork. Real uploads stay untouched.
+          </span>
+        </div>
+        {demoMsg && <div className="settings-notice" style={{ marginTop: 10 }}>{demoMsg}</div>}
       </section>
 
       {/* DJ Mode */}

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
-import { getAllSongs, deleteCompletely, updateSong, getAllFolders, createFolder, deleteFolder, updateFolder, bulkUpdateSongs } from '../utils/db';
+import { getAllSongsFull, deleteCompletely, updateSong, getAllFolders, createFolder, deleteFolder, updateFolder, bulkUpdateSongs } from '../utils/db';
 import { usePlayer } from '../context/PlayerContext';
 import EditSongModal from '../components/EditSongModal';
 import SFXEditor from '../components/SFXEditor';
@@ -42,7 +42,7 @@ export default function SFXManager() {
   useEffect(() => { loadData(); }, []);
 
   async function loadData() {
-    const [allSongs, allFolders] = await Promise.all([getAllSongs(), getAllFolders()]);
+    const [allSongs, allFolders] = await Promise.all([getAllSongsFull(), getAllFolders()]);
     setSongs(allSongs.filter(s => s.type === 'sfx'));
     setFolders(allFolders.filter(f => f.type === 'sfx' || f.type === 'all'));
   }

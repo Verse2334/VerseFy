@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAllSongs, getAllFolders, deleteCompletely, updateSong } from '../utils/db';
+import { getAllSongsFull, getAllFolders, deleteCompletely, updateSong } from '../utils/db';
 import { IoTrash, IoServer, IoMusicalNotes, IoVolumeHigh, IoFolder, IoResize } from 'react-icons/io5';
 import './Pages.css';
 import './Storage.css';
@@ -94,7 +94,7 @@ export default function Storage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [s, f] = await Promise.all([getAllSongs(), getAllFolders()]);
+    const [s, f] = await Promise.all([getAllSongsFull(), getAllFolders()]);
     setSongs(s);
     setFolders(f);
     setLoading(false);

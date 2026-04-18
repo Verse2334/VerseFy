@@ -25,8 +25,7 @@ function initStars(W, H, count = 120) {
 // ===== DRAW: RADIAL =====
 function drawRadial(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, particles, stars) {
   const cx = W / 2, cy = H / 2;
-  ctx.fillStyle = `rgba(4, 2, 12, ${0.15 + energy * 0.1})`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
 
   // Nebula
   for (let i = 0; i < 3; i++) {
@@ -75,8 +74,7 @@ function drawRadial(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase
 
 // ===== DRAW: BARS =====
 function drawBars(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase) {
-  ctx.fillStyle = `rgba(4, 2, 12, 0.2)`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
 
   if (!data) return;
   const barCount = 64, barW = W / barCount - 2, step = Math.max(1, Math.floor(data.length / barCount));
@@ -111,8 +109,7 @@ function drawBars(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase) 
 
 // ===== DRAW: WAVE =====
 function drawWave(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, particles) {
-  ctx.fillStyle = `rgba(4, 2, 12, 0.12)`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
 
   for (const p of particles) {
     p.x += p.vx; p.y += p.vy;
@@ -152,8 +149,7 @@ function drawWave(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, 
 
 // ===== DRAW: GALAXY =====
 function drawGalaxy(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, stars) {
-  ctx.fillStyle = `rgba(2, 1, 8, 0.15)`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
   const cx = W / 2, cy = H / 2;
 
   // Starfield
@@ -212,9 +208,7 @@ function drawEarth(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase,
   const baseR = Math.min(W, H) * 0.28;
   const R = baseR + bass * 6 + beat * 4; // Earth breathes with bass
 
-  // Deep space - darker on drops
-  ctx.fillStyle = `rgba(1, 1, ${4 + Math.floor(energy * 4)}, ${0.06 + energy * 0.06})`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
 
   // Nebula clouds in background - react to frequency data
   if (data) {
@@ -520,9 +514,7 @@ function drawEarth(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase,
 
 // ===== DRAW: CITY SKYLINE =====
 function drawCity(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, cityState) {
-  // Night sky with reactive opacity
-  ctx.fillStyle = `rgba(3, 2, 12, ${0.15 + energy * 0.05})`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
 
   const groundY = H * 0.62;
 
@@ -933,9 +925,7 @@ function drawCity(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, 
 
 // ===== DRAW: NORTHERN LIGHTS =====
 function drawAurora(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase, stars) {
-  // Dark sky with slow fade
-  ctx.fillStyle = `rgba(2, 2, 8, 0.1)`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
 
   // Horizon glow
   const horizY = H * 0.85;
@@ -990,12 +980,13 @@ function drawAurora(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase
     ctx.lineTo(-20, baseY + 200);
     ctx.closePath();
 
-    // Curtain gradient - top bright, fades down
+    // Curtain gradient - top bright, fades down. Bumped 2.5× because trails
+    // are gone now (shapes don't build up over frames), need more per-frame density.
     const curtainGrad = ctx.createLinearGradient(0, baseY - amplitude, 0, baseY + 200);
-    const alpha = 0.04 + energy * 0.06 + (c === 0 ? beat * 0.04 : 0);
-    curtainGrad.addColorStop(0, `hsla(${curtainHue + treble * 20}, 85%, 65%, ${alpha * 1.5})`);
+    const alpha = 0.12 + energy * 0.15 + (c === 0 ? beat * 0.08 : 0);
+    curtainGrad.addColorStop(0, `hsla(${curtainHue + treble * 20}, 85%, 65%, ${alpha * 1.6})`);
     curtainGrad.addColorStop(0.3, `hsla(${curtainHue + 15}, 75%, 50%, ${alpha})`);
-    curtainGrad.addColorStop(0.6, `hsla(${curtainHue + 30}, 60%, 35%, ${alpha * 0.4})`);
+    curtainGrad.addColorStop(0.6, `hsla(${curtainHue + 30}, 60%, 35%, ${alpha * 0.5})`);
     curtainGrad.addColorStop(1, 'transparent');
     ctx.fillStyle = curtainGrad;
     ctx.fill();
@@ -1005,11 +996,11 @@ function drawAurora(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase
     for (let i = 0; i < points.length; i++) {
       i === 0 ? ctx.moveTo(points[i].x, points[i].y) : ctx.lineTo(points[i].x, points[i].y);
     }
-    const edgeAlpha = 0.1 + mid * 0.2 + beat * 0.15;
+    const edgeAlpha = 0.25 + mid * 0.3 + beat * 0.2;
     ctx.strokeStyle = `hsla(${curtainHue}, 90%, 75%, ${edgeAlpha})`;
-    ctx.lineWidth = 1.5 + beat * 2;
-    ctx.shadowColor = `hsla(${curtainHue}, 85%, 70%, 0.4)`;
-    ctx.shadowBlur = 12 + beat * 8;
+    ctx.lineWidth = 2.5 + beat * 3;
+    ctx.shadowColor = `hsla(${curtainHue}, 85%, 70%, 0.5)`;
+    ctx.shadowBlur = 14 + beat * 10;
     ctx.stroke();
     ctx.shadowBlur = 0;
 
@@ -1126,9 +1117,7 @@ function drawOcean(ctx, W, H, t, data, bass, mid, treble, energy, beat, hueBase,
     oceanState.pulses = [];
   }
 
-  // Deep space — very slow fade for long trails
-  ctx.fillStyle = `rgba(1, 1, 4, ${0.03 + energy * 0.02})`;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
 
   // Subtle nebula glow
   ctx.save();
